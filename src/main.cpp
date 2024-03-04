@@ -344,6 +344,33 @@ void audioRecordingCallback(void* userdata, Uint8* stream, int len)
     b->front_pos = (b->front_pos + len) % b->size;
 }
 
+void audioPlaybackCallback(void* userdata, Uint8* stream, int len)
+{
+    AudioBuffer *b = (AudioBuffer*)userdata;
+
+    int region1size = len;
+    int region2size = 0;
+
+    if (b->back_pos + len >= b->size)
+    {
+        region1size = b->size - b->back_pos;
+        region2size = len - region1size;
+    }
+
+    SDL_memcpy(
+    stream,
+    &b->buffer[b->back_pos],
+    region1size
+    );
+    SDL_memcpy(
+    &stream[region1size],
+    b->buffer,
+    region2size
+    );
+
+    b->back_pos = (b->back_pos + len) % b->size;
+}
+
 int clip(int val)
 {
     int out = val;
@@ -403,7 +430,7 @@ void draw(SDL_Texture *tex)
     SDL_UnlockTexture(tex);
 }
 
-void scanner(AudioBuffer *b)
+void scanner(AudioBuffer *b, AudioBuffer *plybck)
 {
     while (b->back_pos != b->front_pos)
     {
@@ -514,12 +541,16 @@ int main ()
         return 0;
     }
 
-    AudioBuffer audio_buffer;
-
     SDL_Window* window = NULL;
     SDL_Renderer* render = NULL;
+
+    AudioBuffer audio_buffer;
+    AudioBuffer sound_playback;
+
+//// Open recording device
     SDL_AudioDeviceID recordingDeviceId = 0;
     SDL_AudioSpec desiredRecordingSpec;
+    SDL_AudioSpec gReceivedRecordingSpec;
     SDL_zero(desiredRecordingSpec);
 	desiredRecordingSpec.freq = sFreq;
 	desiredRecordingSpec.format = AUDIO_S16;
@@ -527,12 +558,13 @@ int main ()
 	desiredRecordingSpec.samples = SAMPLE_SIZE;
 	desiredRecordingSpec.callback = audioRecordingCallback;
     desiredRecordingSpec.userdata = &audio_buffer;
-	gRecordingDeviceCount = SDL_GetNumAudioDevices(SDL_TRUE);
+	int gRecordingDeviceCount = SDL_GetNumAudioDevices(SDL_TRUE);
 	if(gRecordingDeviceCount < 1)
 	{
 		printf( "Unable to get audio capture device! SDL Error: %s\n", SDL_GetError() );
 		return 0;
 	}
+    printf("\n");
 	int index;
 	for(int i = 0; i < gRecordingDeviceCount; ++i)
 	{
@@ -541,7 +573,7 @@ int main ()
 
 		printf("%d - %s\n", i, deviceName);
 	}
-	printf("Choose audio input device\n");
+	printf("Choose signal input device\n");
 	scanf("%d", &index);
 	//Open recording device
 	recordingDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(index, SDL_TRUE), SDL_TRUE, &desiredRecordingSpec, &gReceivedRecordingSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
@@ -568,6 +600,60 @@ int main ()
 	audio_buffer.buffer = new Uint8[audio_buffer.size];
 	memset(audio_buffer.buffer, 0, audio_buffer.size);
 
+///// Open playback device
+    SDL_AudioDeviceID playbackDeviceId = 0;
+    SDL_AudioSpec desiredPlaybackSpec;
+    SDL_AudioSpec gReceivedPlaybackSpec;
+    SDL_zero(desiredPlaybackSpec);
+    desiredPlaybackSpec.freq = sFreq;
+    desiredPlaybackSpec.format = AUDIO_S16;
+    desiredPlaybackSpec.channels = 1;
+    desiredPlaybackSpec.samples = SAMPLE_SIZE;
+    desiredPlaybackSpec.callback = audioPlaybackCallback;
+    desiredPlaybackSpec.userdata = &sound_playback;
+    int gPlaybackDeviceCount = SDL_GetNumAudioDevices(SDL_FALSE);
+    if(gPlaybackDeviceCount < 1)
+	{
+		printf( "Unable to get audio output device! SDL Error: %s\n", SDL_GetError() );
+		return 0;
+	}
+    printf("\n");
+    for(int i = 0; i < gPlaybackDeviceCount; ++i)
+	{
+		//Get capture device name
+		const char* deviceName = SDL_GetAudioDeviceName(i, SDL_FALSE);
+
+		printf("%d - %s\n", i, deviceName);
+	}
+	printf("Choose audio playback device\n");
+	scanf("%d", &index);
+    //Open playback device
+	playbackDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(index, SDL_FALSE), SDL_FALSE, &desiredPlaybackSpec, &gReceivedPlaybackSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+	// Device failed to open
+	if(playbackDeviceId == 0)
+	{
+		//Report error
+		printf("Failed to open playback device! SDL Error: %s", SDL_GetError() );
+		return 1;
+	}
+
+    if (gReceivedPlaybackSpec.format != AUDIO_S16 || gReceivedPlaybackSpec.samples != SAMPLE_SIZE || gReceivedPlaybackSpec.freq != sFreq)
+    {
+        printf("Unsuported audio format!\n");
+        return 1;
+    }
+
+    //Calculate per sample bytes
+	sound_playback.BytesInSample = gReceivedPlaybackSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedPlaybackSpec.format) / 8);
+
+	sound_playback.size = (SAMPLE_SIZE * sound_playback.BytesInSample) * 4;
+
+	//Allocate and initialize byte buffer
+	sound_playback.buffer = new Uint8[sound_playback.size];
+	memset(sound_playback.buffer, 0, sound_playback.size);
+
+
+///// Window creation
     window = SDL_CreateWindow("Compact Cassette Video Player", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
     screen_w, screen_h, SDL_WINDOW_SHOWN);
     if (window == NULL)
@@ -601,7 +687,10 @@ int main ()
 	//Go back to beginning of buffer
 	audio_buffer.front_pos = 0;
     audio_buffer.back_pos = 0;
+    sound_playback.front_pos = 0;
+    sound_playback.back_pos = 0;
 	SDL_PauseAudioDevice( recordingDeviceId, SDL_FALSE );
+    SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
     bool run = true;
     SDL_Event e;
     while (run)
@@ -636,7 +725,7 @@ int main ()
             }
         }
 
-        scanner(&audio_buffer);
+        scanner(&audio_buffer, &sound_playback);
 
         if (update_display)
         {
@@ -649,14 +738,11 @@ int main ()
         }
     }
 
-	if( audio_buffer.buffer != NULL )
-	{
-		delete[] audio_buffer.buffer;
-		audio_buffer.buffer = NULL;
-	}
-
+	delete[] audio_buffer.buffer;
+	delete[] sound_playback.buffer;
     SDL_FreeFormat(fmt);
     SDL_CloseAudioDevice(recordingDeviceId);
+    SDL_CloseAudioDevice(playbackDeviceId);
     SDL_DestroyRenderer(render);
     SDL_DestroyWindow(window);
     SDL_Quit();

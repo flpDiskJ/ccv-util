@@ -57,9 +57,6 @@ Sint16 lo_sync_threshold = 0;
 bool update_display = true;
 int sync_block_delay = 0;
 
-//Recieved audio spec
-SDL_AudioSpec gReceivedRecordingSpec;
-
 //Recording data buffer
 struct AudioBuffer{
     Uint8* buffer;
@@ -68,7 +65,7 @@ struct AudioBuffer{
     Uint32 back_pos;
     Uint8 BytesInSample;
 };
-int gRecordingDeviceCount = 0;
+
 SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
 
