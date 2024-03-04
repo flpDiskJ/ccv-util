@@ -1,4 +1,5 @@
 // Code by Jake Aigner December 2023
+// Functional: March, 2024
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "include/stb_image.h"
@@ -313,18 +314,31 @@ public:
 
 };
 
-void audioRecordingCallback(void* userdata, Uint8* stream, int len )
+void audioRecordingCallback(void* userdata, Uint8* stream, int len)
 {
-	//Copy audio from stream
-	std::memcpy(&gRecordingBuffer[ gBufferBytePosition ], stream, len);
+    AudioBuffer *b = (AudioBuffer*)userdata;
 
-	//Move along buffer
-	gBufferBytePosition += len;
-    if (gBufferBytePosition >= gBufferByteMaxPosition)
+    int region1size = len;
+    int region2size = 0;
+
+    if (b->front_pos + len > b->size)
     {
-        gBufferBytePosition = 0;
+        region1size = b->size - b->front_pos;
+        region2size = len - region1size;
     }
-    new_data_in_buffer = true;
+
+    SDL_memcpy(
+    &b->buffer[b->front_pos],
+    stream,
+    region1size
+    );
+    SDL_memcpy(
+    b->buffer,
+    &stream[region1size],
+    region2size
+    );
+
+    b->front_pos = (b->front_pos + len) % b->size;
 }
 
 int clip(int val)
@@ -362,14 +376,14 @@ void draw(SDL_Texture *tex)
     SDL_LockTexture(tex, NULL, &pixels, &pitch);
     for (int y = 0; y < frame_h; y++)
     {
-        for (int ln = (offset/2), ad = 0; ln < (offset/2)+(frame_w/2); ln++, ad += 2)
+        for (int ln = chroma_offset, ad = 0; ln < chroma_offset+(frame_w/2); ln++, ad += 2)
         {
             u_line[ad] = chroma_u_data[ln][y];
             u_line[ad+1] = chroma_u_data[ln][y];
             v_line[ad] = chroma_v_data[ln][y];
             v_line[ad+1] = chroma_v_data[ln][y];
         }
-        for (int x = 0; x < frame_w; x++)
+        for (int x = 0; x < frame_w-1; x++)
         {
             l = luma_data[x+offset][y];
             u = u_line[x];
@@ -386,17 +400,17 @@ void draw(SDL_Texture *tex)
     SDL_UnlockTexture(tex);
 }
 
-void scanner()
+void scanner(AudioBuffer *b)
 {
-    for (int pos = 0; pos < SAMPLE_SIZE - 3; pos += 4)
+    while (b->back_pos != b->front_pos)
     {
         if (swap_endianess)
         {
-            chan2 = ((gRecordingBuffer[pos] & 0xFF) << 8) | (gRecordingBuffer[pos+1] & 0xFF);
-            chan1 = ((gRecordingBuffer[pos+2] & 0xFF) << 8) | (gRecordingBuffer[pos+3] & 0xFF);
+            chan2 = ((b->buffer[b->back_pos] & 0xFF) << 8) | (b->buffer[b->back_pos+1] & 0xFF);
+            chan1 = ((b->buffer[b->back_pos+2] & 0xFF) << 8) | (b->buffer[b->back_pos+3] & 0xFF);
         } else {
-            chan1 = ((gRecordingBuffer[pos+1] & 0xFF) << 8) | (gRecordingBuffer[pos] & 0xFF);
-            chan2 = ((gRecordingBuffer[pos+3] & 0xFF) << 8) | (gRecordingBuffer[pos+2] & 0xFF);
+            chan1 = ((b->buffer[b->back_pos+1] & 0xFF) << 8) | (b->buffer[b->back_pos] & 0xFF);
+            chan2 = ((b->buffer[b->back_pos+3] & 0xFF) << 8) | (b->buffer[b->back_pos+2] & 0xFF);
         }
         if (swap_channels)
         {
@@ -459,6 +473,13 @@ void scanner()
             xCord++;
         }
 
+        if (b->back_pos >= b->size)
+        {
+            b->back_pos = 0;
+        } else {
+            b->back_pos += b->BytesInSample;
+        }
+
     }
 }
 
@@ -490,6 +511,8 @@ int main ()
         return 0;
     }
 
+    AudioBuffer audio_buffer;
+
     SDL_Window* window = NULL;
     SDL_Renderer* render = NULL;
     SDL_AudioDeviceID recordingDeviceId = 0;
@@ -500,6 +523,7 @@ int main ()
 	desiredRecordingSpec.channels = 2;
 	desiredRecordingSpec.samples = SAMPLE_SIZE;
 	desiredRecordingSpec.callback = audioRecordingCallback;
+    desiredRecordingSpec.userdata = &audio_buffer;
 	gRecordingDeviceCount = SDL_GetNumAudioDevices(SDL_TRUE);
 	if(gRecordingDeviceCount < 1)
 	{
@@ -531,18 +555,15 @@ int main ()
         printf("Unsuported audio format!\n");
         return 1;
     }
+
 	//Calculate per sample bytes
-	int bytesPerSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
-	//Calculate bytes per second
-	int bytesPerSecond = gReceivedRecordingSpec.freq * bytesPerSample;
-	//Calculate buffer size
-	gBufferByteSize = SAMPLE_SIZE * 4;
-	//Calculate max buffer use
-	gBufferByteMaxPosition = SAMPLE_SIZE;
+	audio_buffer.BytesInSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
+
+	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 3;
 
 	//Allocate and initialize byte buffer
-	gRecordingBuffer = new Uint8[gBufferByteSize];
-	std::memset(gRecordingBuffer, 0, gBufferByteSize);
+	audio_buffer.buffer = new Uint8[audio_buffer.size];
+	memset(audio_buffer.buffer, 0, audio_buffer.size);
 
     window = SDL_CreateWindow("Compact Cassette Video Player", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
     screen_w, screen_h, SDL_WINDOW_SHOWN);
@@ -566,7 +587,7 @@ int main ()
     display_rec.x = (screen_w / 2) - (display_rec.w / 2);
     display_rec.y = (screen_h / 2) - (display_rec.h / 2);
 
-    hi_sync_threshold = (pow(2, 16) / 2) / sync_detect_sensitivity;
+    hi_sync_threshold = (double)(pow(2, 16) / 2) / sync_detect_sensitivity;
     lo_sync_threshold = 0 - hi_sync_threshold;
 
     clear_buffs();
@@ -575,7 +596,8 @@ int main ()
 
     // begin recording
 	//Go back to beginning of buffer
-	gBufferBytePosition = 0;
+	audio_buffer.front_pos = 0;
+    audio_buffer.back_pos = 0;
 	SDL_PauseAudioDevice( recordingDeviceId, SDL_FALSE );
     bool run = true;
     SDL_Event e;
@@ -605,11 +627,7 @@ int main ()
             }
         }
 
-        if (new_data_in_buffer)
-        {
-            new_data_in_buffer = false;
-            scanner();
-        }
+        scanner(&audio_buffer);
 
         if (update_display)
         {
@@ -622,10 +640,10 @@ int main ()
         }
     }
 
-	if( gRecordingBuffer != NULL )
+	if( audio_buffer.buffer != NULL )
 	{
-		delete[] gRecordingBuffer;
-		gRecordingBuffer = NULL;
+		delete[] audio_buffer.buffer;
+		audio_buffer.buffer = NULL;
 	}
 
     SDL_FreeFormat(fmt);

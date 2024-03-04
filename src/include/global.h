@@ -26,37 +26,44 @@ const int chroma_w = 42;
 const int frame_h = 64;
 
 // playback
-bool invert_signal = false;
-const int luma_level = 80; // lower is more
-const int chroma_level = 80; // lower is more
-const double sync_detect_sensitivity = 1.2; // 1 <
-const int offset = 10;
+bool invert_signal = true;
+bool swap_endianess = false;
+bool swap_channels = false;
+const int luma_level = 60; // lower is more
+const int chroma_level = 60; // lower is more
+const double sync_detect_sensitivity = 2.5; // 1<  // higher is more sensitive
+const int offset = 11;
+const int chroma_offset = 1;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
-const int SAMPLE_SIZE = 1024;
+const int SAMPLE_SIZE = 512;
 const int sFreq = 48000;
-const int screen_w = 640;
-const int screen_h = 480;
-const int SCALE = 4;
+const int screen_w = 800;
+const int screen_h = 600;
+const int SCALE = 6;
 
+int luma_data[scan_w][frame_h];
+int chroma_u_data[scan_w][frame_h];
+int chroma_v_data[scan_w][frame_h];
 int xCord = 0;
 int yCord = 0;
 int interlace = 0;
 Sint16 hi_sync_threshold = 0;
 Sint16 lo_sync_threshold = 0;
 bool update_display = true;
-bool new_data_in_buffer = false;
 int sync_block_delay = 0;
+
 //Recieved audio spec
 SDL_AudioSpec gReceivedRecordingSpec;
+
 //Recording data buffer
-Uint8* gRecordingBuffer = NULL;
-//Size of data buffer
-Uint32 gBufferByteSize = 0;
-//Position in data buffer
-Uint32 gBufferBytePosition = 0;
-//Maximum position in data buffer for recording
-Uint32 gBufferByteMaxPosition = 0;
+struct AudioBuffer{
+    Uint8* buffer;
+    Uint32 size;
+    Uint32 front_pos;
+    Uint32 back_pos;
+    Uint8 BytesInSample;
+};
 int gRecordingDeviceCount = 0;
 SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
