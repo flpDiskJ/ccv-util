@@ -265,12 +265,12 @@ public:
                     l = (l * luma_amp) - (((luma_amp*255)-255)/2);
                     if (l > 255){l = 255;}
                     if (l < 0){l = 0;}
-                    if (u > 255){u = 255;}
-                    if (u < 0){u = 0;}
-                    if (v > 255){v = 255;}
-                    if (v < 0){v = 0;}
-                    u_buff[x] = (u-128) * chroma_signal_amp;
-                    v_buff[x] = (v-128) * chroma_signal_amp;
+                    if (u > 127){u = 127;}
+                    if (u < -128){u = -128;}
+                    if (v > 127){v = 127;}
+                    if (v < -128){v = -128;}
+                    u_buff[x] = u * chroma_signal_amp;
+                    v_buff[x] = v * chroma_signal_amp;
                     l_buff[x] = (l-128) * signal_amp;
                 } // x loop
 
@@ -324,7 +324,7 @@ void audioRecordingCallback(void* userdata, Uint8* stream, int len)
     int region1size = len;
     int region2size = 0;
 
-    if (b->front_pos + len > b->size)
+    if (b->front_pos + len >= b->size)
     {
         region1size = b->size - b->front_pos;
         region2size = len - region1size;
@@ -464,7 +464,7 @@ void scanner(AudioBuffer *b)
 
         if (xCord > 13 && xCord < 56)
         {
-            chroma_u_data[xCord-14][yCord] = chan1 / chroma_level;
+            chroma_u_data[xCord-14][yCord] = (chan1 / chroma_level);
         }
         if (xCord > 55 && xCord < 98)
         {
@@ -476,7 +476,7 @@ void scanner(AudioBuffer *b)
             xCord++;
         }
 
-        if (b->back_pos >= b->size)
+        if (b->back_pos >= b->size - b->BytesInSample)
         {
             b->back_pos = 0;
         } else {
@@ -562,7 +562,7 @@ int main ()
 	//Calculate per sample bytes
 	audio_buffer.BytesInSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
 
-	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 3;
+	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 4;
 
 	//Allocate and initialize byte buffer
 	audio_buffer.buffer = new Uint8[audio_buffer.size];

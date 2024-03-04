@@ -10,19 +10,17 @@
 #include <ctime>
 #include <math.h>
 
-const int chroma_signal_offset = -60;
-
 // encoder
 #define AUDIO_RATE 19200
 #define SAMPLES_INFRAME 4000
 #define SYNC_HI 4000
 #define SYNC_LO -4000
 
-const int audio_peak = 800;
-const int signal_peak = 1000;
-const int chroma_signal_peak = 1000;
+const int audio_peak = 900;
+const int signal_peak = 800;
+const int chroma_signal_peak = 800;
 
-const double chroma_amp = 1.1;
+const double chroma_amp = 1;
 const double luma_amp = 1;
 
 const int output_signal_amp = 6;
@@ -35,11 +33,11 @@ const int frame_h = 64;
 bool invert_signal = false;
 bool swap_endianess = false;
 bool swap_channels = false;
-const int luma_level = 70; // lower is more
-const int chroma_level = 70; // lower is more
+const int luma_level = 30; // lower is more
+const int chroma_level = 30; // lower is more
 const double sync_detect_sensitivity = 2.4; // 1<  // higher is more sensitive
 const int offset = 11;
-const int chroma_offset = 1;
+const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
 const int SAMPLE_SIZE = 512;
@@ -74,8 +72,8 @@ int gRecordingDeviceCount = 0;
 SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
 
-const double signal_amp = signal_peak / 127.0; // -127 to 127 * signal_amp
-const double chroma_signal_amp = chroma_signal_peak / 127.0;
+const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
+const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
 using namespace std;
 
 #endif
