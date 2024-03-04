@@ -165,6 +165,20 @@ private:
         blank(2, 2);
     }
 
+    void audio_sync() // 10s
+    {
+        for (int s = 0; s < 5; s++, chan1_pos++)
+        {
+            channel1[chan1_pos] = SYNC_LO;
+        }
+        for (int s = 0; s < 3; s++, chan1_pos++)
+        {
+            channel1[chan1_pos] = SYNC_HI;
+        }
+        blank(1, 2);
+        blank(2, 10);
+    }
+
     void write_wav()
     {
         AudioFile<int> audioFile;
@@ -292,14 +306,21 @@ public:
                 blank(1, 3);
             } // y loop
             y_offset = !y_offset;
-            for (int a = 0; a < 800; a++, audio_pos++, chan1_pos++)
+
+            // Audio
+            audio_sync();
+            blank(1, 10);
+            blank(2, 10);
+            for (int a = 0; a < AUDIO_SCAN_LEN; a++, audio_pos++, chan1_pos++)
             {
                 channel1[chan1_pos] = audio[audio_pos];
             }
-            for (int a = 0; a < 800; a++, audio_pos++, chan2_pos++)
+            for (int a = 0; a < AUDIO_SCAN_LEN; a++, audio_pos++, chan2_pos++)
             {
                 channel2[chan2_pos] = audio[audio_pos];
             }
+            blank(1, 780-AUDIO_SCAN_LEN);
+            blank(2, 780-AUDIO_SCAN_LEN);
         } // frame loop
         write_wav();
     }
@@ -482,6 +503,11 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
                 yCord = interlace = !interlace;
             }
         }
+        if (chan1 < lo_sync_threshold && sync_block_delay == 0)
+        {
+            audio_scan_pos = 0;
+            sync_block_delay = sync_delay;
+        }
         if (sync_block_delay > 0)
         {
             sync_block_delay--;
@@ -501,6 +527,35 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
         if (xCord < scan_w)
         {
             xCord++;
+        }
+
+        if (yCord == 0 || yCord == 1) // copy stitched audio from previous frame to playback buffer
+        {
+            for (int stitch_pos = 0; stitch_pos < AUDIO_SCAN_LEN*2; stitch_pos++)
+            {
+                for (int upsample = 0; upsample < (sFreq / AUDIO_RATE); upsample++) // converts AUDIO_RATE to sFreq for proper playback speed
+                {
+                    plybck->buffer[plybck->front_pos] = audio_stitch[stitch_pos] & 0xFF;
+                    plybck->buffer[plybck->front_pos+1] = audio_stitch[stitch_pos] >> 8 & 0xFF;
+
+                    if (plybck->front_pos >= plybck->size - plybck->BytesInSample)
+                    {
+                        plybck->front_pos = 0;
+                    } else {
+                        plybck->front_pos += plybck->BytesInSample;
+                    }
+                }
+            }
+        }
+
+        if (audio_scan_pos - audio_scan_offset < AUDIO_SCAN_LEN)
+        {
+            if (audio_scan_pos >= audio_scan_offset)
+            {
+                audio_stitch[(audio_scan_pos-audio_scan_offset)] = chan1 * sound_level;
+                audio_stitch[(audio_scan_pos-audio_scan_offset)+AUDIO_SCAN_LEN] = chan2 * sound_level;
+            }
+            audio_scan_pos++;
         }
 
         if (b->back_pos >= b->size - b->BytesInSample)
@@ -689,6 +744,7 @@ int main ()
     audio_buffer.back_pos = 0;
     sound_playback.front_pos = 0;
     sound_playback.back_pos = 0;
+    memset(audio_stitch, 0, AUDIO_SCAN_LEN*2);
 	SDL_PauseAudioDevice( recordingDeviceId, SDL_FALSE );
     SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
     bool run = true;

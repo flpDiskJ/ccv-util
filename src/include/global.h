@@ -11,7 +11,8 @@
 #include <math.h>
 
 // encoder
-#define AUDIO_RATE 19200
+#define AUDIO_RATE 12000 // WARNING: sFreq / AUDIO_RATE must be a whole number!
+#define AUDIO_SCAN_LEN 500
 #define SAMPLES_INFRAME 4000
 #define SYNC_HI 4000
 #define SYNC_LO -4000
@@ -30,6 +31,7 @@ const int chroma_w = 42;
 const int frame_h = 64;
 
 // playback
+double sound_level = 2;
 bool invert_signal = false;
 bool swap_endianess = false;
 bool swap_channels = false;
@@ -37,6 +39,7 @@ const int luma_level = 30; // lower is more
 const int chroma_level = 30; // lower is more
 const double sync_detect_sensitivity = 2.4; // 1<  // higher is more sensitive
 const int offset = 11;
+const int audio_scan_offset = 15;
 const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
@@ -68,6 +71,8 @@ struct AudioBuffer{
 
 SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
+Sint16 audio_stitch[AUDIO_SCAN_LEN*2]; // buffer used to stitch audio parts from chan1 and chan2
+int audio_scan_pos = AUDIO_SCAN_LEN;
 
 const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
 const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
