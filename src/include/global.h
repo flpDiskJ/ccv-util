@@ -10,28 +10,34 @@
 #include <ctime>
 #include <math.h>
 
+const int chroma_signal_offset = -60;
+
 // encoder
 #define AUDIO_RATE 19200
 #define SAMPLES_INFRAME 4000
 #define SYNC_HI 4000
 #define SYNC_LO -4000
 
-const int audio_peak = 600;
-const int signal_peak = 500;
+const int audio_peak = 800;
+const int signal_peak = 1000;
+const int chroma_signal_peak = 1000;
 
-const int output_signal_amp = 5;
+const double chroma_amp = 1.1;
+const double luma_amp = 1;
+
+const int output_signal_amp = 6;
 const int frame_w = 85;
 const int scan_w = 100;
 const int chroma_w = 42;
 const int frame_h = 64;
 
 // playback
-bool invert_signal = true;
+bool invert_signal = false;
 bool swap_endianess = false;
 bool swap_channels = false;
-const int luma_level = 60; // lower is more
-const int chroma_level = 60; // lower is more
-const double sync_detect_sensitivity = 2.5; // 1<  // higher is more sensitive
+const int luma_level = 70; // lower is more
+const int chroma_level = 70; // lower is more
+const double sync_detect_sensitivity = 2.4; // 1<  // higher is more sensitive
 const int offset = 11;
 const int chroma_offset = 1;
 const int sync_delay = 15;
@@ -69,6 +75,7 @@ SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
 
 const double signal_amp = signal_peak / 127.0; // -127 to 127 * signal_amp
+const double chroma_signal_amp = chroma_signal_peak / 127.0;
 using namespace std;
 
 #endif

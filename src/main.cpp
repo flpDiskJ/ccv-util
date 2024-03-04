@@ -260,14 +260,17 @@ public:
                     l = 0.299*r + 0.587*g + 0.114*b;
                     u = -0.147*r - 0.289*g + 0.436*b;
                     v = 0.615*r - 0.515*g - 0.100*b;
+                    u = (u * chroma_amp);
+                    v = (v * chroma_amp);
+                    l = (l * luma_amp) - (((luma_amp*255)-255)/2);
                     if (l > 255){l = 255;}
                     if (l < 0){l = 0;}
                     if (u > 255){u = 255;}
                     if (u < 0){u = 0;}
                     if (v > 255){v = 255;}
                     if (v < 0){v = 0;}
-                    u_buff[x] = (u-128) * signal_amp;
-                    v_buff[x] = (v-128) * signal_amp;
+                    u_buff[x] = (u-128) * chroma_signal_amp;
+                    v_buff[x] = (v-128) * chroma_signal_amp;
                     l_buff[x] = (l-128) * signal_amp;
                 } // x loop
 
@@ -465,7 +468,7 @@ void scanner(AudioBuffer *b)
         }
         if (xCord > 55 && xCord < 98)
         {
-            chroma_u_data[xCord-56][yCord] = chan1 / chroma_level;
+            chroma_v_data[xCord-56][yCord] = chan1 / chroma_level;
         }
 
         if (xCord < scan_w)
@@ -617,6 +620,12 @@ int main ()
                     } else {
                         switch (e.key.keysym.sym)
                         {
+                            case SDLK_i:
+                                invert_signal = !invert_signal;
+                                break;
+                            case SDLK_c:
+                                swap_channels = !swap_channels;
+                                break;
                             default:
                                 break;
                         }
