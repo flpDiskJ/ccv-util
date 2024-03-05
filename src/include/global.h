@@ -11,8 +11,8 @@
 #include <math.h>
 
 // encoder
-#define AUDIO_RATE 12000 // WARNING: sFreq / AUDIO_RATE must be a whole number!
-#define AUDIO_SCAN_LEN 500
+#define AUDIO_RATE 12288
+#define AUDIO_SCAN_LEN 512
 #define SAMPLES_INFRAME 4000
 #define SYNC_HI 4000
 #define SYNC_LO -4000
@@ -39,7 +39,7 @@ const int luma_level = 30; // lower is more
 const int chroma_level = 30; // lower is more
 const double sync_detect_sensitivity = 2.4; // 1<  // higher is more sensitive
 const int offset = 11;
-const int audio_scan_offset = 15;
+const int audio_scan_offset = 32;
 const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
@@ -47,7 +47,7 @@ const int SAMPLE_SIZE = 512;
 const int sFreq = 48000;
 const int screen_w = 800;
 const int screen_h = 600;
-const int SCALE = 6;
+const int SCALE = 5;
 
 int luma_data[scan_w][frame_h];
 int chroma_u_data[scan_w][frame_h];
