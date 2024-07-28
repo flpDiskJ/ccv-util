@@ -17,9 +17,9 @@
 #define SYNC_HI 4000
 #define SYNC_LO -4000
 
-const int audio_peak = 700;
-const int signal_peak = 700;
-const int chroma_signal_peak = 700;
+const int audio_peak = 600;
+const int signal_peak = 600;
+const int chroma_signal_peak = 600;
 
 const double chroma_amp = 1;
 const double luma_amp = 1;
@@ -35,16 +35,16 @@ double sound_level = 2;
 bool invert_signal = true;
 bool swap_endianess = false;
 bool swap_channels = false;
-const int luma_level = 40; // lower is more
-const int chroma_level = 50; // lower is more
-const double sync_detect_sensitivity = 2.3; // 1<  // higher is more sensitive
+const int luma_level = 20; // lower is more
+const int chroma_level = 20; // lower is more
+const double sync_detect_sensitivity = 1.8; // 1<  // higher is more sensitive
+const unsigned int adaptive_sync_interval = 4000 * 5;
 const int offset = 11;
-const int audio_scan_offset = 40;
-const int audio_sync_range_adjust = 200; // widens sync detect for audio
+const int audio_scan_offset = 30;
 const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
-const int SAMPLE_SIZE = 1024;
+const int SAMPLE_SIZE = 2048;
 const int sFreq = 48000;
 const int screen_w = 800;
 const int screen_h = 600;
@@ -56,8 +56,6 @@ int chroma_v_data[scan_w][frame_h];
 int xCord = 0;
 int yCord = 0;
 int interlace = 0;
-Sint16 hi_sync_threshold = 0;
-Sint16 lo_sync_threshold = 0;
 bool update_display = true;
 int sync_block_delay = 0;
 
@@ -81,6 +79,16 @@ SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
 float chan1_level, chan2_level;
 signed int audio_scan_pos = AUDIO_SCAN_LEN;
+
+// adaptive sync threshold
+struct adaptiveSync{
+    Sint32 max = 1;
+    Sint32 min = -1;
+    Sint32 sync_high;
+    Sint32 sync_low;
+};
+adaptiveSync sync_1, sync_2;
+unsigned int tick_count = 0;
 
 const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
 const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
