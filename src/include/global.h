@@ -17,9 +17,9 @@
 #define SYNC_HI 4000
 #define SYNC_LO -4000
 
-const int audio_peak = 900;
-const int signal_peak = 800;
-const int chroma_signal_peak = 800;
+const int audio_peak = 700;
+const int signal_peak = 700;
+const int chroma_signal_peak = 700;
 
 const double chroma_amp = 1;
 const double luma_amp = 1;
