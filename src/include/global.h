@@ -32,18 +32,19 @@ const int frame_h = 64;
 
 // playback
 double sound_level = 2;
-bool invert_signal = false;
+bool invert_signal = true;
 bool swap_endianess = false;
 bool swap_channels = false;
-const int luma_level = 30; // lower is more
-const int chroma_level = 30; // lower is more
-const double sync_detect_sensitivity = 2.4; // 1<  // higher is more sensitive
+const int luma_level = 40; // lower is more
+const int chroma_level = 50; // lower is more
+const double sync_detect_sensitivity = 2.3; // 1<  // higher is more sensitive
 const int offset = 11;
-const int audio_scan_offset = 32;
+const int audio_scan_offset = 40;
+const int audio_sync_range_adjust = 200; // widens sync detect for audio
 const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
-const int SAMPLE_SIZE = 512;
+const int SAMPLE_SIZE = 1024;
 const int sFreq = 48000;
 const int screen_w = 800;
 const int screen_h = 600;
@@ -69,10 +70,17 @@ struct AudioBuffer{
     Uint8 BytesInSample;
 };
 
+struct AudioStitch
+{
+    Sint16 data[AUDIO_SCAN_LEN];
+    unsigned int pos = 0;
+};
+AudioStitch c1_buffer, c2_buffer;
+
 SDL_PixelFormat *fmt;
 Sint16 chan1, chan2;
-Sint16 audio_stitch[AUDIO_SCAN_LEN*2]; // buffer used to stitch audio parts from chan1 and chan2
-int audio_scan_pos = AUDIO_SCAN_LEN;
+float chan1_level, chan2_level;
+signed int audio_scan_pos = AUDIO_SCAN_LEN;
 
 const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
 const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;

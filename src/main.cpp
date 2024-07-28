@@ -104,7 +104,7 @@ private:
             audio[x] = (int)(audio[x] / amp);
         }
         return true;
-    } // load_audio()
+    }
 
     void blank(int chan, int amount)
     {
@@ -486,6 +486,19 @@ int clip16(int input)
     }
 }
 
+void stitch_audio(Sint16 *output)
+{
+    unsigned int pos = 0;
+    for (int x = 0; x < AUDIO_SCAN_LEN; x++)
+    {
+        output[pos++] = c1_buffer.data[x];
+    }
+    for (int x = 0; x < AUDIO_SCAN_LEN; x++)
+    {
+        output[pos++] = c2_buffer.data[x];
+    }
+}
+
 void scanner(AudioBuffer *b, AudioBuffer *plybck)
 {
     while (b->back_pos != b->front_pos)
@@ -510,6 +523,9 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
             chan1 = 0 - chan1;
             chan2 = 0 - chan2;
         }
+
+        chan1 = chan1 * chan1_level;
+        chan2 = chan2 * chan2_level;
 
         if (chan2 > hi_sync_threshold && sync_block_delay == 0)
         {
@@ -538,17 +554,21 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
                 yCord = interlace = !interlace;
             }
         }
-        if (chan1 < lo_sync_threshold && sync_block_delay == 0)
+        if (chan1 < lo_sync_threshold - audio_sync_range_adjust && sync_block_delay == 0)
         {
             audio_scan_pos = 0 - audio_scan_offset;
+            c1_buffer.pos = 0;
+            c2_buffer.pos = 0;
             sync_block_delay = sync_delay;
             int actual_pos = 0;
             double stitch_pos = 0;
             double adv = (double)AUDIO_RATE / (double)sFreq;
+            Sint16 full_audio[AUDIO_SCAN_LEN*2];
+            stitch_audio(&full_audio[0]);
             while (actual_pos < AUDIO_SCAN_LEN * 2)
             {
-                plybck->buffer[plybck->front_pos] = audio_stitch[actual_pos] & 0xFF;
-                plybck->buffer[plybck->front_pos+1] = audio_stitch[actual_pos] >> 8 & 0xFF;
+                plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
+                plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
 
                 if (plybck->front_pos > plybck->size - plybck->BytesInSample)
                 {
@@ -585,8 +605,8 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
         {
             if (audio_scan_pos >= 0)
             {
-                audio_stitch[audio_scan_pos] = clip16(chan1 * sound_level);
-                audio_stitch[audio_scan_pos+AUDIO_SCAN_LEN] = clip16(chan2 * sound_level);
+                c1_buffer.data[c1_buffer.pos++] = clip16(chan1 * sound_level);
+                c2_buffer.data[c2_buffer.pos++] = clip16(chan2 * sound_level);
             }
             audio_scan_pos++;
         }
@@ -608,6 +628,8 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
 int main ()
 {
     int mode;
+    chan1_level = 1.0;
+    chan2_level = 1.0;
     printf("0 for Encoding | 1 for Player\n");
 	scanf("%d", &mode);
     if (mode != 0 && mode != 1)
@@ -682,7 +704,10 @@ int main ()
 	//Calculate per sample bytes
 	audio_buffer.BytesInSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
 
-	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 4;
+	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 6;
+
+    audio_buffer.front_pos = audio_buffer.size / 2;
+    audio_buffer.back_pos = 0;
 
 	//Allocate and initialize byte buffer
 	audio_buffer.buffer = new Uint8[audio_buffer.size];
@@ -725,7 +750,8 @@ int main ()
 		return 1;
 	}
 
-    if (gReceivedPlaybackSpec.format != AUDIO_S16 || gReceivedPlaybackSpec.samples != SAMPLE_SIZE || gReceivedPlaybackSpec.freq != sFreq)
+    if (gReceivedPlaybackSpec.format != AUDIO_S16 || gReceivedPlaybackSpec.samples != SAMPLE_SIZE
+        || gReceivedPlaybackSpec.freq != sFreq || gReceivedPlaybackSpec.channels != 1)
     {
         printf("Unsuported audio format!\n");
         return 1;
@@ -734,7 +760,10 @@ int main ()
     //Calculate per sample bytes
 	sound_playback.BytesInSample = gReceivedPlaybackSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedPlaybackSpec.format) / 8);
 
-	sound_playback.size = (SAMPLE_SIZE * sound_playback.BytesInSample) * 4;
+	sound_playback.size = (SAMPLE_SIZE * sound_playback.BytesInSample) * 6;
+
+    sound_playback.front_pos = sound_playback.size / 2;
+    sound_playback.back_pos = 0;
 
 	//Allocate and initialize byte buffer
 	sound_playback.buffer = new Uint8[sound_playback.size];
@@ -771,13 +800,6 @@ int main ()
 
     fmt = SDL_AllocFormat(SDL_GetWindowPixelFormat(window));
 
-    // begin recording
-	//Go back to beginning of buffer
-	audio_buffer.front_pos = 0;
-    audio_buffer.back_pos = 0;
-    sound_playback.front_pos = 0;
-    sound_playback.back_pos = 0;
-    memset(audio_stitch, 0, AUDIO_SCAN_LEN*2);
 	SDL_PauseAudioDevice( recordingDeviceId, SDL_FALSE );
     SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
     bool run = true;
@@ -798,6 +820,30 @@ int main ()
                     } else {
                         switch (e.key.keysym.sym)
                         {
+                            case SDLK_UP:
+                                if (chan1_level < 15.0)
+                                {
+                                    chan1_level += 0.05;
+                                }
+                                break;
+                            case SDLK_DOWN:
+                                if (chan1_level > 0.1)
+                                {
+                                    chan1_level -= 0.05;
+                                }
+                                break;
+                            case SDLK_RIGHT:
+                                if (chan2_level < 15.0)
+                                {
+                                    chan2_level += 0.05;
+                                }
+                                break;
+                            case SDLK_LEFT:
+                                if (chan2_level > 0.1)
+                                {
+                                    chan2_level -= 0.05;
+                                }
+                                break;
                             case SDLK_i:
                                 invert_signal = !invert_signal;
                                 break;
