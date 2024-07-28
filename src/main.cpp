@@ -585,7 +585,7 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
                 plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
                 plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
 
-                if (plybck->front_pos > plybck->size - plybck->BytesInSample)
+                if (plybck->front_pos >= plybck->size - plybck->BytesInSample)
                 {
                     plybck->front_pos = 0;
                 } else {
@@ -745,7 +745,7 @@ int main ()
 	//Calculate per sample bytes
 	audio_buffer.BytesInSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
 
-	audio_buffer.size = (SAMPLE_SIZE * audio_buffer.BytesInSample) * 6;
+	audio_buffer.size = SAMPLE_SIZE * 8;
 
     audio_buffer.front_pos = audio_buffer.size / 2;
     audio_buffer.back_pos = 0;
@@ -801,7 +801,7 @@ int main ()
     //Calculate per sample bytes
 	sound_playback.BytesInSample = gReceivedPlaybackSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedPlaybackSpec.format) / 8);
 
-	sound_playback.size = (SAMPLE_SIZE * sound_playback.BytesInSample) * 6;
+	sound_playback.size = SAMPLE_SIZE * 8;
 
     sound_playback.front_pos = sound_playback.size / 2;
     sound_playback.back_pos = 0;
