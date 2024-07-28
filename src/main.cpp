@@ -580,7 +580,8 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
             double adv = (double)AUDIO_RATE / (double)sFreq;
             Sint16 full_audio[AUDIO_SCAN_LEN*2];
             stitch_audio(&full_audio[0]);
-            while (actual_pos < AUDIO_SCAN_LEN * 2)
+            int sample_count = 0;
+            while (plybck->front_pos != plybck->back_pos && sample_count < 8000)
             {
                 plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
                 plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
@@ -593,6 +594,10 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
                 }
                 stitch_pos += adv;
                 actual_pos = (int)stitch_pos;
+                if (actual_pos >= AUDIO_SCAN_LEN*2)
+                {
+                    actual_pos = (AUDIO_SCAN_LEN*2) - 1;
+                }
             }
             memset(&full_audio[0], 0, AUDIO_SCAN_LEN*2);
         }
@@ -745,9 +750,9 @@ int main ()
 	//Calculate per sample bytes
 	audio_buffer.BytesInSample = gReceivedRecordingSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedRecordingSpec.format) / 8);
 
-	audio_buffer.size = SAMPLE_SIZE * 8;
+	audio_buffer.size = SAMPLE_SIZE * 6;
 
-    audio_buffer.front_pos = audio_buffer.size / 2;
+    audio_buffer.front_pos = SAMPLE_SIZE * 3;
     audio_buffer.back_pos = 0;
 
 	//Allocate and initialize byte buffer
@@ -801,9 +806,9 @@ int main ()
     //Calculate per sample bytes
 	sound_playback.BytesInSample = gReceivedPlaybackSpec.channels * (SDL_AUDIO_BITSIZE(gReceivedPlaybackSpec.format) / 8);
 
-	sound_playback.size = SAMPLE_SIZE * 8;
+	sound_playback.size = SAMPLE_SIZE * 6;
 
-    sound_playback.front_pos = sound_playback.size / 2;
+    sound_playback.front_pos = SAMPLE_SIZE * 3;
     sound_playback.back_pos = 0;
 
 	//Allocate and initialize byte buffer
