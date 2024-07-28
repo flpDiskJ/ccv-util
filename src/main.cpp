@@ -2,11 +2,32 @@
 // Functional: March, 2024
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "include/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "include/stb_image_write.h"
-#include "include/AudioFile.h"
-#include "include/global.h"
+
+#include "include/ccv_image.h"
+
+double sound_level = 2;
+bool invert_signal = true;
+bool swap_endianess = false;
+bool swap_channels = false;
+int luma_data[scan_w][frame_h];
+int chroma_u_data[scan_w][frame_h];
+int chroma_v_data[scan_w][frame_h];
+int xCord = 0;
+int yCord = 0;
+int interlace = 0;
+bool update_display = true;
+int sync_block_delay = 0;
+
+AudioStitch c1_buffer, c2_buffer;
+
+SDL_PixelFormat *fmt;
+Sint16 chan1, chan2;
+float chan1_level, chan2_level;
+signed int audio_scan_pos = AUDIO_SCAN_LEN;
+
+adaptiveSync sync_1, sync_2;
+unsigned int tick_count = 0;
 
 class Encoder
 {
@@ -181,7 +202,7 @@ private:
         // Setup audioFile specs
         audioFile.setAudioBufferSize (2, signal_length);
         audioFile.setBitDepth (16);
-        audioFile.setSampleRate (48000);
+        audioFile.setSampleRate (sFreq);
         for (int x = 0; x < signal_length; x++)
         {
             audioFile.samples[0][x] = channel1[x] * output_signal_amp;
@@ -676,11 +697,17 @@ int main ()
     int mode;
     chan1_level = 1.0;
     chan2_level = 1.0;
-    printf("0 for Encoding | 1 for Player\n");
+    printf("0 for Video Encoding (CCV)\n1 for Display\n2 for Image Encoding (CCI)\n");
 	scanf("%d", &mode);
-    if (mode != 0 && mode != 1)
+    if (mode != 0 && mode != 1 && mode != 2)
     {
         printf("Invalid entry!\n");
+        return 0;
+    }
+
+    if (mode == 2)
+    {
+        ccv_image make_image;
         return 0;
     }
 
@@ -694,6 +721,7 @@ int main ()
     {
         Encoder encode;
         SDL_Quit();
+        printf("Done!\n");
         return 0;
     }
 

@@ -8,6 +8,7 @@ set(SRC ${CMAKE_SOURCE_DIR}/src)
 
 add_executable(ccv
 	${SRC}/main.cpp
+	${SRC}/ccv_image.cpp
 )
 target_include_directories(
 	ccv PUBLIC

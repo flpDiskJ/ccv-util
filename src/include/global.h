@@ -1,5 +1,4 @@
-#ifndef GLOBAL_H
-#define GLOBAL_H
+#pragma once
 
 #include <SDL.h>
 #include <cstdio>
@@ -9,6 +8,14 @@
 #include <sstream>
 #include <ctime>
 #include <math.h>
+#include "AudioFile.h"
+
+#include "stb_image.h"
+#include "stb_image_write.h"
+
+using namespace std;
+
+const int sFreq = 48000;
 
 // encoder
 #define AUDIO_RATE 12288
@@ -31,10 +38,6 @@ const int chroma_w = 42;
 const int frame_h = 64;
 
 // playback
-double sound_level = 2;
-bool invert_signal = true;
-bool swap_endianess = false;
-bool swap_channels = false;
 const int luma_level = 25; // lower is more
 const int chroma_level = 35; // lower is more
 const double sync_detect_sensitivity = 2.2; // 1<  // higher is more sensitive
@@ -45,19 +48,9 @@ const int chroma_offset = 0;
 const int sync_delay = 15;
 const int MAX_RECORDING_DEVICES = 10;
 const int SAMPLE_SIZE = 2048;
-const int sFreq = 48000;
 const int screen_w = 800;
 const int screen_h = 600;
 const int SCALE = 5;
-
-int luma_data[scan_w][frame_h];
-int chroma_u_data[scan_w][frame_h];
-int chroma_v_data[scan_w][frame_h];
-int xCord = 0;
-int yCord = 0;
-int interlace = 0;
-bool update_display = true;
-int sync_block_delay = 0;
 
 //Recording data buffer
 struct AudioBuffer{
@@ -73,25 +66,14 @@ struct AudioStitch
     Sint16 data[AUDIO_SCAN_LEN];
     unsigned int pos = 0;
 };
-AudioStitch c1_buffer, c2_buffer;
-
-SDL_PixelFormat *fmt;
-Sint16 chan1, chan2;
-float chan1_level, chan2_level;
-signed int audio_scan_pos = AUDIO_SCAN_LEN;
 
 // adaptive sync threshold
 struct adaptiveSync{
-    Sint32 max = 1;
-    Sint32 min = -1;
+    Sint32 max = 1000;
+    Sint32 min = -1000;
     Sint32 sync_high;
     Sint32 sync_low;
 };
-adaptiveSync sync_1, sync_2;
-unsigned int tick_count = 0;
 
 const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
 const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
-using namespace std;
-
-#endif
