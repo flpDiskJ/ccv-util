@@ -19,6 +19,10 @@ int interlace = 0;
 bool update_display = true;
 int sync_block_delay = 0;
 
+Uint8 display_mode = CCV_PLAYBACK;
+
+int cci_u[375], cci_v[375], cci_l[750];
+
 AudioStitch c1_buffer, c2_buffer;
 
 SDL_PixelFormat *fmt;
@@ -530,7 +534,33 @@ void set_sync_threshold()
     sync_2.min = -1000;
 }
 
-void scanner(AudioBuffer *b, AudioBuffer *plybck)
+void draw_cci_line(SDL_Texture *tex, int y)
+{
+    void *pixels;
+    int pitch;
+    int actual_pos = 0;
+    double pos = 0;
+    int r, g, b, l, u, v;
+    SDL_LockTexture(tex, NULL, &pixels, &pitch);
+    for (int x = 0; x < 750; x++)
+    {
+        l = cci_l[x];
+        u = cci_u[actual_pos];
+        v = cci_v[actual_pos];
+        r = l + 1.140*v;
+        g = l - 0.395*u - 0.581*v;
+        b = l + 2.032*u;
+        r = clip(r);
+        g = clip(g);
+        b = clip(b);
+        ((Uint32*)pixels)[ x + (y * 750) ] = SDL_MapRGB(fmt, b, g, r);
+        pos += 0.5;
+        actual_pos = (int)pos;
+    }
+    SDL_UnlockTexture(tex);
+}
+
+void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
 {
     Sint32 level_check1, level_check2; // used for normalization
     while (b->back_pos != b->front_pos)
@@ -563,126 +593,176 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
         chan1 = clip16(chan1 * chan1_level);
         chan2 = clip16(chan2 * chan2_level);
 
-        if (chan2 > sync_2.sync_high && sync_block_delay == 0)
+        if (display_mode == CCV_PLAYBACK)
         {
-            yCord = 0;
-            interlace = 0;
-            xCord = 0;
-            update_display = true;
-            sync_block_delay = sync_delay;
-        }
-        if (chan2 < sync_2.sync_low && sync_block_delay == 0)
-        {
-            yCord = 1;
-            interlace = 1;
-            xCord = 0;
-            update_display = true;
-            sync_block_delay = sync_delay;
-        }
-        if (chan1 > sync_1.sync_high && sync_block_delay == 0)
-        {
-            xCord = 0;
-            yCord += 2;
-            sync_block_delay = sync_delay;
-            if (yCord >= frame_h)
+
+            if (chan2 > sync_2.sync_high && sync_block_delay == 0)
             {
+                yCord = 0;
+                interlace = 0;
+                xCord = 0;
                 update_display = true;
-                yCord = interlace = !interlace;
+                sync_block_delay = sync_delay;
             }
-        }
-        if (chan1 < sync_1.sync_low && sync_block_delay == 0)
-        {
-            audio_scan_pos = 0 - audio_scan_offset;
-            c1_buffer.pos = 0;
-            c2_buffer.pos = 0;
-            sync_block_delay = sync_delay;
-            int actual_pos = 0;
-            double stitch_pos = 0;
-            double adv = (double)AUDIO_RATE / (double)sFreq;
-            Sint16 full_audio[AUDIO_SCAN_LEN*2];
-            stitch_audio(&full_audio[0]);
-            int sample_count = 0;
-            while (plybck->front_pos != plybck->back_pos && sample_count < 8000)
+            if (chan2 < sync_2.sync_low && sync_block_delay == 0)
             {
-                plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
-                plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
-
-                if (plybck->front_pos >= plybck->size - plybck->BytesInSample)
+                yCord = 1;
+                interlace = 1;
+                xCord = 0;
+                update_display = true;
+                sync_block_delay = sync_delay;
+            }
+            if (chan1 > sync_1.sync_high && sync_block_delay == 0)
+            {
+                xCord = 0;
+                yCord += 2;
+                sync_block_delay = sync_delay;
+                if (yCord >= frame_h)
                 {
-                    plybck->front_pos = 0;
+                    update_display = true;
+                    yCord = interlace = !interlace;
+                }
+            }
+            if (chan1 < sync_1.sync_low && sync_block_delay == 0)
+            {
+                audio_scan_pos = 0 - audio_scan_offset;
+                c1_buffer.pos = 0;
+                c2_buffer.pos = 0;
+                sync_block_delay = sync_delay;
+                int actual_pos = 0;
+                double stitch_pos = 0;
+                double adv = (double)AUDIO_RATE / (double)sFreq;
+                Sint16 full_audio[AUDIO_SCAN_LEN*2];
+                stitch_audio(&full_audio[0]);
+                int sample_count = 0;
+                while (plybck->front_pos != plybck->back_pos && sample_count < 8000)
+                {
+                    plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
+                    plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
+
+                    if (plybck->front_pos >= plybck->size - plybck->BytesInSample)
+                    {
+                        plybck->front_pos = 0;
+                    } else {
+                        plybck->front_pos += plybck->BytesInSample;
+                    }
+                    stitch_pos += adv;
+                    actual_pos = (int)stitch_pos;
+                    if (actual_pos >= AUDIO_SCAN_LEN*2)
+                    {
+                        actual_pos = (AUDIO_SCAN_LEN*2) - 1;
+                    }
+                }
+                memset(&full_audio[0], 0, AUDIO_SCAN_LEN*2);
+            }
+            if (sync_block_delay > 0)
+            {
+                sync_block_delay--;
+            }
+
+            luma_data[xCord][yCord] = (chan2 / luma_level) + 127;
+
+            if (xCord > 13 && xCord < 56)
+            {
+                chroma_u_data[xCord-14][yCord] = (chan1 / chroma_level);
+            }
+            if (xCord > 55 && xCord < 98)
+            {
+                chroma_v_data[xCord-56][yCord] = chan1 / chroma_level;
+            }
+
+            if (xCord < scan_w)
+            {
+                xCord++;
+            }
+
+            if (audio_scan_pos < AUDIO_SCAN_LEN)
+            {
+                if (audio_scan_pos >= 0)
+                {
+                    c1_buffer.data[c1_buffer.pos++] = clip16(chan1 * sound_level);
+                    c2_buffer.data[c2_buffer.pos++] = clip16(chan2 * sound_level);
+                }
+                audio_scan_pos++;
+            }
+
+            if (b->back_pos >= b->size - b->BytesInSample)
+            {
+                b->back_pos = 0;
+            } else {
+                b->back_pos += b->BytesInSample;
+            }
+
+            // adaptive sync threshold
+            if (level_check1 > sync_1.max)
+            {
+                sync_1.max = level_check1;
+            } else if (level_check1 < sync_1.min)
+            {
+                sync_1.min = level_check1;
+            }
+
+            if (level_check2 > sync_2.max)
+            {
+                sync_2.max = level_check2;
+            } else if (level_check2 < sync_2.min)
+            {
+                sync_2.min = level_check2;
+            }
+
+            if (tick_count > adaptive_sync_interval)
+            {
+                set_sync_threshold();
+                tick_count = 0;
+            } else {
+                tick_count++;
+            }
+
+        }
+        else if (display_mode == CCI_DISPLAY)
+        {
+            if (chan1 > cci_sync_high && sync_block_delay == 0)
+            {
+                sync_block_delay = sync_delay;
+                draw_cci_line(cci_tex, yCord);
+                update_display = true;
+                yCord = 0;
+                xCord = 0;
+            }
+            if (chan1 < cci_sync_low && sync_block_delay == 0)
+            {
+                sync_block_delay = sync_delay;
+                draw_cci_line(cci_tex, yCord);
+                update_display = true;
+                xCord = 0;
+                if (yCord < 500)
+                {
+                    yCord++;
                 } else {
-                    plybck->front_pos += plybck->BytesInSample;
-                }
-                stitch_pos += adv;
-                actual_pos = (int)stitch_pos;
-                if (actual_pos >= AUDIO_SCAN_LEN*2)
-                {
-                    actual_pos = (AUDIO_SCAN_LEN*2) - 1;
+                    yCord = 0;
                 }
             }
-            memset(&full_audio[0], 0, AUDIO_SCAN_LEN*2);
-        }
-        if (sync_block_delay > 0)
-        {
-            sync_block_delay--;
-        }
 
-        luma_data[xCord][yCord] = (chan2 / luma_level) + 127;
-
-        if (xCord > 13 && xCord < 56)
-        {
-            chroma_u_data[xCord-14][yCord] = (chan1 / chroma_level);
-        }
-        if (xCord > 55 && xCord < 98)
-        {
-            chroma_v_data[xCord-56][yCord] = chan1 / chroma_level;
-        }
-
-        if (xCord < scan_w)
-        {
-            xCord++;
-        }
-
-        if (audio_scan_pos < AUDIO_SCAN_LEN)
-        {
-            if (audio_scan_pos >= 0)
+            if (xCord >= 60 && xCord < 810)
             {
-                c1_buffer.data[c1_buffer.pos++] = clip16(chan1 * sound_level);
-                c2_buffer.data[c2_buffer.pos++] = clip16(chan2 * sound_level);
+                cci_l[xCord-60] = (chan2 / 250) + 128;
+                if (xCord >= 60 && xCord < 435)
+                {
+                    cci_u[xCord-60] = chan1 / 2;
+                } else if (xCord >= 435 && xCord < 810)
+                {
+                    cci_v[xCord-435] = chan1 / 2;
+                }
             }
-            audio_scan_pos++;
-        }
+            if (xCord < 850)
+            {
+                xCord++;
+            }
 
-        if (b->back_pos >= b->size - b->BytesInSample)
-        {
-            b->back_pos = 0;
-        } else {
-            b->back_pos += b->BytesInSample;
-        }
-
-        // adaptive sync threshold
-        if (level_check1 > sync_1.max)
-        {
-            sync_1.max = level_check1;
-        } else if (level_check1 < sync_1.min)
-        {
-            sync_1.min = level_check1;
-        }
-
-        if (level_check2 > sync_2.max)
-        {
-            sync_2.max = level_check2;
-        } else if (level_check2 < sync_2.min)
-        {
-            sync_2.min = level_check2;
-        }
-
-        if (tick_count > adaptive_sync_interval)
-        {
-            set_sync_threshold();
-            tick_count = 0;
-        } else {
-            tick_count++;
+            if (sync_block_delay > 0)
+            {
+                sync_block_delay--;
+            }
         }
 
     }
@@ -861,11 +941,18 @@ int main ()
     }
 
     SDL_Texture* display_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, frame_w, frame_h);
+    SDL_Texture* display_image_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 750, 500);
     SDL_Rect display_rec;
     display_rec.w = frame_w*SCALE;
     display_rec.h = frame_h*SCALE;
     display_rec.x = (screen_w / 2) - (display_rec.w / 2);
     display_rec.y = (screen_h / 2) - (display_rec.h / 2);
+
+    SDL_Rect display_image_rec;
+    display_image_rec.w = 750;
+    display_image_rec.h = 500;
+    display_image_rec.x = (screen_w / 2) - (display_image_rec.w / 2);
+    display_image_rec.y = (screen_h / 2) - (display_image_rec.h / 2);
 
     clear_buffs();
 
@@ -891,6 +978,21 @@ int main ()
                     } else {
                         switch (e.key.keysym.sym)
                         {
+                            case SDLK_r:
+                                update_display = true;
+                                break;
+                            case SDLK_1:
+                                display_mode = CCV_PLAYBACK;
+                                update_display = true;
+                                xCord = yCord = 0;
+                                SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
+                                break;
+                            case SDLK_2:
+                                display_mode = CCI_DISPLAY;
+                                update_display = true;
+                                xCord = yCord = 0;
+                                SDL_PauseAudioDevice( playbackDeviceId, SDL_TRUE );
+                                break;
                             case SDLK_UP:
                                 if (chan1_level < 15.0)
                                 {
@@ -931,15 +1033,25 @@ int main ()
             }
         }
 
-        scanner(&audio_buffer, &sound_playback);
+        scanner(&audio_buffer, &sound_playback, display_image_tex);
 
         if (update_display)
         {
             update_display = false;
-            draw(display_tex);
             SDL_SetRenderDrawColor(render, 0, 0, 0, 0xFF); // Background color
             SDL_RenderClear(render);
-            SDL_RenderCopy(render, display_tex, NULL, &display_rec);
+            switch (display_mode)
+            {
+                case CCV_PLAYBACK:
+                    draw(display_tex);
+                    SDL_RenderCopy(render, display_tex, NULL, &display_rec);
+                    break;
+                case CCI_DISPLAY:
+                    SDL_RenderCopy(render, display_image_tex, NULL, &display_image_rec);
+                    break;
+                default:
+                    break;
+            }
             SDL_RenderPresent(render);
         }
     }

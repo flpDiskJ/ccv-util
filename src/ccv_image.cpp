@@ -89,8 +89,8 @@ void ccv_image::convert_image(int i)
             if (u < -130){u = -130;}
             if (v > 130){v = 130;}
             if (v < -130){v = -130;}
-            chroma_u[x] = u;
-            chroma_v[x] = v;
+            chroma_u[x] = u * 2;
+            chroma_v[x] = v * 2;
             luma[x] = l;
         }
         stitch(chroma_u, chroma_v, luma);

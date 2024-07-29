@@ -38,6 +38,12 @@ const int chroma_w = 42;
 const int frame_h = 64;
 
 // playback
+const Uint8 CCV_PLAYBACK = 0;
+const Uint8 CCI_DISPLAY = 1;
+
+const Sint16 cci_sync_high = 15000;
+const Sint16 cci_sync_low = -15000;
+
 const int luma_level = 25; // lower is more
 const int chroma_level = 35; // lower is more
 const double sync_detect_sensitivity = 2.2; // 1<  // higher is more sensitive
@@ -45,7 +51,7 @@ const unsigned int adaptive_sync_interval = 4000 * 5;
 const int offset = 11;
 const int audio_scan_offset = 30;
 const int chroma_offset = 0;
-const int sync_delay = 15;
+const int sync_delay = 40; // amount of samples to block sync trigger
 const int MAX_RECORDING_DEVICES = 10;
 const int SAMPLE_SIZE = 2048;
 const int screen_w = 800;

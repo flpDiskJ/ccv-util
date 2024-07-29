@@ -1,27 +1,45 @@
-Input Specs:
+CCV:
+    Input Specs:
 
-  PNG Image Sequence RGB
+      PNG Image Sequence RGB
 
-  85 x 64 pixels
+      85 x 64 pixels
 
-  12 FPS
+      12 FPS
 
-  Audio: Signed 16bit WAV, 1 or 2 channel, 48 or 44.1 kHz
+      Audio: Signed 16bit WAV, 1 or 2 channel, 48 or 44.1 kHz
 
 
-Actual Specs:
+    Actual Specs:
 
-  85 X 64
+      85 X 64
 
-  12i FPS
+      12i FPS
 
-  Audio: 19.2kHz mono
+      Audio: 19.2kHz mono
+
+CCI:
+    Input Specs:
+        750 w
+        500 h
+        8bit RGB
+        PNG(s)
 
 
 Player Info:
 
-  Hit 'ESC' to quit
+  'ESC' to quit
 
-  Hit 'i' key to toggle signal inversion
+  'i' key to toggle signal inversion
 
-  Hit 'c' key to swap input channels
+  'c' key to swap input channels
+
+  'e' key to swap byte endian
+
+  'r' to refresh screen
+
+  Arrows adjust chan 1 and 2 level
+
+  Modes:
+      '1' = CCV
+      '2' = CCI
