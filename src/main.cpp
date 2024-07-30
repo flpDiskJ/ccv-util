@@ -5,6 +5,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "include/ccv_image.h"
+#include "include/ccv2.h"
 
 double sound_level = 2;
 bool invert_signal = true;
@@ -21,7 +22,7 @@ int sync_block_delay = 0;
 
 Uint8 display_mode = CCV_PLAYBACK;
 
-int cci_u[375], cci_v[375], cci_l[750];
+int cci_u[750], cci_v[750], cci_l[1500];
 
 AudioStitch c1_buffer, c2_buffer;
 
@@ -212,7 +213,7 @@ private:
             audioFile.samples[0][x] = channel1[x] * output_signal_amp;
             audioFile.samples[1][x] = channel2[x] * output_signal_amp;
         }
-        audioFile.save ("output/signal.wav", AudioFileFormat::Wave);
+        audioFile.save ("output/CCV_signal.wav", AudioFileFormat::Wave);
     }
 
 public:
@@ -295,9 +296,6 @@ public:
                     l = 0.299*r + 0.587*g + 0.114*b;
                     u = -0.147*r - 0.289*g + 0.436*b;
                     v = 0.615*r - 0.515*g - 0.100*b;
-                    u = (u * chroma_amp);
-                    v = (v * chroma_amp);
-                    l = (l * luma_amp) - (((luma_amp*255)-255)/2);
                     if (l > 255){l = 255;}
                     if (l < 0){l = 0;}
                     if (u > 127){u = 127;}
@@ -538,24 +536,23 @@ void draw_cci_line(SDL_Texture *tex, int y)
 {
     void *pixels;
     int pitch;
-    int actual_pos = 0;
-    double pos = 0;
+    int pos = 0;
     int r, g, b, l, u, v;
     SDL_LockTexture(tex, NULL, &pixels, &pitch);
-    for (int x = 0; x < 750; x++)
+    for (int x = 0; x < 1500; x += 2)
     {
-        l = cci_l[x];
-        u = cci_u[actual_pos];
-        v = cci_v[actual_pos];
+        l = (cci_l[x] + cci_l[x+1]) / 2;
+        u = cci_u[pos];
+        v = cci_v[pos];
         r = l + 1.140*v;
         g = l - 0.395*u - 0.581*v;
         b = l + 2.032*u;
         r = clip(r);
         g = clip(g);
         b = clip(b);
-        ((Uint32*)pixels)[ x + (y * 750) ] = SDL_MapRGB(fmt, b, g, r);
-        pos += 0.5;
-        actual_pos = (int)pos;
+        r = g = b = 100;
+        ((Uint32*)pixels)[ pos + (y * 750) ] = SDL_MapRGB(fmt, b, g, r);
+        pos++;
     }
     SDL_UnlockTexture(tex);
 }
@@ -743,18 +740,18 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
                 }
             }
 
-            if (xCord >= 60 && xCord < 810)
+            if (xCord >= 60 && xCord < 1560)
             {
-                cci_l[xCord-60] = (chan2 / 250) + 128;
-                if (xCord >= 60 && xCord < 435)
+                cci_l[xCord-60] = (int)((chan2 / 120) + 128);
+                if (xCord >= 60 && xCord < 810)
                 {
-                    cci_u[xCord-60] = chan1 / 2;
-                } else if (xCord >= 435 && xCord < 810)
+                    cci_u[xCord-60] = (int)chan1;
+                } else if (xCord >= 810 && xCord < 1560)
                 {
-                    cci_v[xCord-435] = chan1 / 2;
+                    cci_v[xCord-810] = (int)chan1;
                 }
             }
-            if (xCord < 850)
+            if (xCord < 1600)
             {
                 xCord++;
             }
@@ -777,9 +774,9 @@ int main ()
     int mode;
     chan1_level = 1.0;
     chan2_level = 1.0;
-    printf("0 for Video Encoding (CCV)\n1 for Display\n2 for Image Encoding (CCI)\n");
+    printf("0 for CCV encoding \n1 for display\n2 for CCI encoding\n3 for CCV2 encoding\n");
 	scanf("%d", &mode);
-    if (mode != 0 && mode != 1 && mode != 2)
+    if (mode != 0 && mode != 1 && mode != 2 && mode != 3)
     {
         printf("Invalid entry!\n");
         return 0;
@@ -802,6 +799,13 @@ int main ()
         Encoder encode;
         SDL_Quit();
         printf("Done!\n");
+        return 0;
+    }
+
+    if (mode == 3)
+    {
+        ccv_2 ccv2_encode;
+        SDL_Quit();
         return 0;
     }
 
@@ -941,6 +945,7 @@ int main ()
     }
 
     SDL_Texture* display_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, frame_w, frame_h);
+    SDL_Texture* display_ccv2_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 120, 90);
     SDL_Texture* display_image_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 750, 500);
     SDL_Rect display_rec;
     display_rec.w = frame_w*SCALE;
@@ -988,6 +993,12 @@ int main ()
                                 SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
                                 break;
                             case SDLK_2:
+                                display_mode = CCV2_PLAYBACK;
+                                update_display = true;
+                                xCord = yCord = 0;
+                                SDL_PauseAudioDevice( playbackDeviceId, SDL_FALSE );
+                                break;
+                            case SDLK_3:
                                 display_mode = CCI_DISPLAY;
                                 update_display = true;
                                 xCord = yCord = 0;
@@ -1045,6 +1056,9 @@ int main ()
                 case CCV_PLAYBACK:
                     draw(display_tex);
                     SDL_RenderCopy(render, display_tex, NULL, &display_rec);
+                    break;
+                case CCV2_PLAYBACK:
+                    SDL_RenderCopy(render, display_ccv2_tex, NULL, &display_rec);
                     break;
                 case CCI_DISPLAY:
                     SDL_RenderCopy(render, display_image_tex, NULL, &display_image_rec);

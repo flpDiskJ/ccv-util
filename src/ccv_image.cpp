@@ -84,13 +84,13 @@ void ccv_image::convert_image(int i)
             l -= 128; // 128 <-> -127
             if (l > 130){l = 130;}
             if (l < -130){l = -130;}
-            l *= sync_high / 130; // sync_high <-> -sync_high
+            l *= (sync_high / 2) / 130;
             if (u > 130){u = 130;}
             if (u < -130){u = -130;}
             if (v > 130){v = 130;}
             if (v < -130){v = -130;}
-            chroma_u[x] = u * 2;
-            chroma_v[x] = v * 2;
+            chroma_u[x] = u * ((sync_high / 5) / 130);
+            chroma_v[x] = v * ((sync_high / 5) / 130);
             luma[x] = l;
         }
         stitch(chroma_u, chroma_v, luma);
@@ -111,7 +111,7 @@ void ccv_image::make_wav()
         audioFile.samples[0][x] = channel_1[x] * signal_multiplier;
         audioFile.samples[1][x] = channel_2[x] * signal_multiplier;
     }
-    audioFile.save ("output/image_signal.wav", AudioFileFormat::Wave);
+    audioFile.save ("output/CCI_signal.wav", AudioFileFormat::Wave);
 }
 
 void ccv_image::stitch(Sint32 *u, Sint32 *v, Sint32 *l)
@@ -119,17 +119,20 @@ void ccv_image::stitch(Sint32 *u, Sint32 *v, Sint32 *l)
     Sint16 val = 0;
     for (int i = 0; i < frame_width; i += 2)
     {
-        val = (u[i] + u[i+1]) / 2;
+        val = (Sint16)((u[i] + u[i+1]) / 2);
+        channel_1.push_back(val);
         channel_1.push_back(val);
     }
     for (int i = 0; i < frame_width; i += 2)
     {
-        val = (v[i] + v[i+1]) / 2;
+        val = (Sint16)((v[i] + v[i+1]) / 2);
+        channel_1.push_back(val);
         channel_1.push_back(val);
     }
     for (int i = 0; i < frame_width; i++)
     {
         val = (Sint16)l[i];
+        channel_2.push_back(val);
         channel_2.push_back(val);
     }
     blank(40);
@@ -146,30 +149,30 @@ void ccv_image::blank(int sNum)
 
 void ccv_image::sync_x()
 {
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_low);
         channel_2.push_back(sync_low);
     }
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_high);
         channel_2.push_back(sync_high);
     }
-    blank(40);
+    blank(44);
 }
 
 void ccv_image::sync_y()
 {
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_high);
         channel_2.push_back(sync_high);
     }
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_low);
         channel_2.push_back(sync_low);
     }
-    blank(40);
+    blank(44);
 }

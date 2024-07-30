@@ -42,4 +42,5 @@ Player Info:
 
   Modes:
       '1' = CCV
-      '2' = CCI
+      '2' = CCV2
+      '3' = CCI (non-functional)

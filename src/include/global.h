@@ -15,35 +15,17 @@
 
 using namespace std;
 
-const int sFreq = 48000;
+// Adjustable encoding constants
+#define SYNC_HI 32000
+#define SYNC_LO -32000
+const int audio_peak = 5000;
+const int signal_peak = 5000;
+const int chroma_signal_peak = 5000;
+const int output_signal_amp = 1;
 
-// encoder
-#define AUDIO_RATE 12288
-#define AUDIO_SCAN_LEN 512
-#define SAMPLES_INFRAME 4000
-#define SYNC_HI 4000
-#define SYNC_LO -4000
-
-const int audio_peak = 600;
-const int signal_peak = 600;
-const int chroma_signal_peak = 600;
-
-const double chroma_amp = 1;
-const double luma_amp = 1;
-
-const int output_signal_amp = 6;
-const int frame_w = 85;
-const int scan_w = 100;
-const int chroma_w = 42;
-const int frame_h = 64;
-
-// playback
-const Uint8 CCV_PLAYBACK = 0;
-const Uint8 CCI_DISPLAY = 1;
-
+// Adjustable playback constants
 const Sint16 cci_sync_high = 15000;
 const Sint16 cci_sync_low = -15000;
-
 const int luma_level = 25; // lower is more
 const int chroma_level = 35; // lower is more
 const double sync_detect_sensitivity = 2.2; // 1<  // higher is more sensitive
@@ -57,6 +39,25 @@ const int SAMPLE_SIZE = 2048;
 const int screen_w = 800;
 const int screen_h = 600;
 const int SCALE = 5;
+
+
+// DO NOT ALTER
+const int sFreq = 48000;
+#define AUDIO_RATE 12288
+#define CCV2_AUDIO_RATE 13600
+#define AUDIO_SCAN_LEN 512
+#define SAMPLES_INFRAME 4000
+const int frame_w = 85;
+const int scan_w = 100;
+const int chroma_w = 42;
+const int frame_h = 64;
+
+const Uint8 CCV_PLAYBACK = 0;
+const Uint8 CCV2_PLAYBACK = 1;
+const Uint8 CCI_DISPLAY = 2;
+
+const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
+const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
 
 //Recording data buffer
 struct AudioBuffer{
@@ -80,6 +81,3 @@ struct adaptiveSync{
     Sint32 sync_high;
     Sint32 sync_low;
 };
-
-const double signal_amp = (double)signal_peak / 127.0; // -127 to 127 * signal_amp
-const double chroma_signal_amp = (double)chroma_signal_peak / 127.0;
