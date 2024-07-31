@@ -11,9 +11,10 @@ double sound_level = 2;
 bool invert_signal = true;
 bool swap_endianess = false;
 bool swap_channels = false;
-int luma_data[scan_w][frame_h];
-int chroma_u_data[scan_w][frame_h];
-int chroma_v_data[scan_w][frame_h];
+int luma_data[120][90];
+int chroma_u_data[120][90];
+int chroma_v_data[120][90];
+vector<int> ccv2_chroma_u, ccv2_chroma_v;
 int xCord = 0;
 int yCord = 0;
 int interlace = 0;
@@ -460,36 +461,79 @@ void draw(SDL_Texture *tex)
 {
     int u_line[scan_w];
     int v_line[scan_w];
+    vector<int> chroma_u_upscale, chroma_v_upscale; // ccv2
     memset(u_line, 0, scan_w);
     memset(v_line, 0, scan_w);
     int r, g, b, l, u, v;
     void *pixels;
     int pitch;
     SDL_LockTexture(tex, NULL, &pixels, &pitch);
-    for (int y = 0; y < frame_h; y++)
+    if (display_mode == CCV_PLAYBACK)
     {
-        for (int ln = chroma_offset, ad = 0; ln < chroma_offset+(frame_w/2); ln++, ad += 2)
+        for (int y = 0; y < frame_h; y++)
         {
-            u_line[ad] = chroma_u_data[ln][y];
-            u_line[ad+1] = chroma_u_data[ln][y];
-            v_line[ad] = chroma_v_data[ln][y];
-            v_line[ad+1] = chroma_v_data[ln][y];
+            for (int ln = chroma_offset, ad = 0; ln < chroma_offset+(frame_w/2); ln++, ad += 2)
+            {
+                u_line[ad] = chroma_u_data[ln][y];
+                u_line[ad+1] = chroma_u_data[ln][y];
+                v_line[ad] = chroma_v_data[ln][y];
+                v_line[ad+1] = chroma_v_data[ln][y];
+            }
+            for (int x = 0; x < frame_w-1; x++)
+            {
+                l = luma_data[x+offset][y];
+                u = u_line[x];
+                v = v_line[x];
+                r = l + 1.140*v;
+                g = l - 0.395*u - 0.581*v;
+                b = l + 2.032*u;
+                r = clip(r);
+                g = clip(g);
+                b = clip(b);
+                ((Uint32*)pixels)[ x + (y * frame_w) ] = SDL_MapRGB(fmt, b, g, r);
+            }
+        }}
+    else
+    {
+        // upscale chroma data from 1800 to 10800
+        for (int c = 0; c < 1800; c++)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                if (c < ccv2_chroma_u.size() && c < ccv2_chroma_v.size())
+                {
+                    chroma_u_upscale.push_back(ccv2_chroma_u[c]);
+                    chroma_v_upscale.push_back(ccv2_chroma_v[c]);
+                } else {
+                    chroma_u_upscale.push_back(0);
+                    chroma_v_upscale.push_back(0);
+                }
+            }
         }
-        for (int x = 0; x < frame_w-1; x++)
+        // draw frame
+        int chroma_position = 0;
+        for (int y = 0; y < 90; y++)
         {
-            l = luma_data[x+offset][y];
-            u = u_line[x];
-            v = v_line[x];
-            r = l + 1.140*v;
-            g = l - 0.395*u - 0.581*v;
-            b = l + 2.032*u;
-            r = clip(r);
-            g = clip(g);
-            b = clip(b);
-            ((Uint32*)pixels)[ x + (y * frame_w) ] = SDL_MapRGB(fmt, b, g, r);
+            for (int x = 0; x < 120; x++)
+            {
+                l = luma_data[x][y];
+                u = chroma_u_upscale[chroma_position];
+                v = chroma_v_upscale[chroma_position++];
+                r = l + 1.140*v;
+                g = l - 0.395*u - 0.581*v;
+                b = l + 2.032*u;
+                r = clip(r);
+                g = clip(g);
+                b = clip(b);
+                ((Uint32*)pixels)[ x + (y * 120) ] = SDL_MapRGB(fmt, b, g, r);
+            }
         }
     }
     SDL_UnlockTexture(tex);
+    chroma_u_upscale.clear();
+    chroma_v_upscale.clear();
+    ccv2_chroma_u.clear();
+    ccv2_chroma_v.clear();
 }
 
 Sint16 clip16(Sint32 input)
@@ -508,16 +552,23 @@ Sint16 clip16(Sint32 input)
 void stitch_audio(Sint16 *output)
 {
     unsigned int pos = 0;
-    for (int x = 0; x < AUDIO_SCAN_LEN; x++)
+    int length;
+    if (display_mode == CCV_PLAYBACK)
+    {
+        length = AUDIO_SCAN_LEN;
+    } else {
+        length = CCV2_AUDIO_SCAN_LEN;
+    }
+    for (int x = 0; x < length; x++)
     {
         output[pos++] = c1_buffer.data[x];
     }
-    for (int x = 0; x < AUDIO_SCAN_LEN; x++)
+    for (int x = 0; x < length; x++)
     {
         output[pos++] = c2_buffer.data[x];
     }
-    memset(&c1_buffer.data[0], 0, AUDIO_SCAN_LEN);
-    memset(&c2_buffer.data[0], 0, AUDIO_SCAN_LEN);
+    memset(&c1_buffer.data[0], 0, length);
+    memset(&c2_buffer.data[0], 0, length);
 }
 
 void set_sync_threshold()
@@ -759,6 +810,136 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
             if (sync_block_delay > 0)
             {
                 sync_block_delay--;
+            }
+        }
+        else if (display_mode == CCV2_PLAYBACK)
+        {
+            if (chan2 > sync_2.sync_high && sync_block_delay == 0)
+            {
+                yCord = 0;
+                interlace = 0;
+                xCord = 0;
+                update_display = true;
+                sync_block_delay = sync_delay;
+            }
+            if (chan2 < sync_2.sync_low && sync_block_delay == 0)
+            {
+                yCord = 1;
+                interlace = 1;
+                xCord = 0;
+                update_display = true;
+                sync_block_delay = sync_delay;
+            }
+            if (chan1 > sync_1.sync_high && sync_block_delay == 0)
+            {
+                xCord = 0;
+                sync_block_delay = sync_delay;
+                if (yCord < 60)
+                {
+                    yCord += 4;
+                } else if (yCord < 90)
+                {
+                    yCord += 2;
+                }
+            }
+            if (chan1 < sync_1.sync_low && sync_block_delay == 0)
+            {
+                audio_scan_pos = 0 - audio_scan_offset;
+                c1_buffer.pos = 0;
+                c2_buffer.pos = 0;
+                sync_block_delay = sync_delay;
+                int ccv2_actual_pos = 0;
+                double ccv2_stitch_pos = 0;
+                double ccv2_adv = (double)CCV2_AUDIO_RATE / (double)sFreq;
+                Sint16 ccv2_full_audio[CCV2_AUDIO_SCAN_LEN*2];
+                stitch_audio(&ccv2_full_audio[0]);
+                while (plybck->front_pos != plybck->back_pos)
+                {
+                    plybck->buffer[plybck->front_pos] = ccv2_full_audio[ccv2_actual_pos] & 0xFF;
+                    plybck->buffer[plybck->front_pos+1] = ccv2_full_audio[ccv2_actual_pos] >> 8 & 0xFF;
+
+                    if (plybck->front_pos >= plybck->size - plybck->BytesInSample)
+                    {
+                        plybck->front_pos = 0;
+                    } else {
+                        plybck->front_pos += plybck->BytesInSample;
+                    }
+                    ccv2_stitch_pos += ccv2_adv;
+                    ccv2_actual_pos = (int)ccv2_stitch_pos;
+                    if (ccv2_actual_pos >= CCV2_AUDIO_SCAN_LEN*2)
+                    {
+                        ccv2_actual_pos = (CCV2_AUDIO_SCAN_LEN*2) - 1;
+                    }
+                }
+                memset(&ccv2_full_audio[0], 0, CCV2_AUDIO_SCAN_LEN*2);
+            }
+            if (sync_block_delay > 0)
+            {
+                sync_block_delay--;
+            }
+
+            if (xCord >= 14 && xCord < 134)
+            {
+                luma_data[xCord-14][yCord] = (chan1 / luma_level) + 127;
+                if (yCord < 60)
+                {
+                    luma_data[xCord-14][yCord+2] = (chan2 / luma_level) + 127;
+                } else {
+                    if (xCord >= 14 && xCord < 74)
+                    {
+                        ccv2_chroma_u.push_back((chan2 / chroma_level));
+                    } else if (xCord >= 74 && xCord < 134)
+                    {
+                        ccv2_chroma_v.push_back((chan2 / chroma_level));
+                    }
+                }
+            }
+
+            if (xCord < 136)
+            {
+                xCord++;
+            }
+
+            if (audio_scan_pos < CCV2_AUDIO_SCAN_LEN)
+            {
+                if (audio_scan_pos >= 0)
+                {
+                    c1_buffer.data[c1_buffer.pos++] = clip16(chan1 * sound_level);
+                    c2_buffer.data[c2_buffer.pos++] = clip16(chan2 * sound_level);
+                }
+                audio_scan_pos++;
+            }
+
+            if (b->back_pos >= b->size - b->BytesInSample)
+            {
+                b->back_pos = 0;
+            } else {
+                b->back_pos += b->BytesInSample;
+            }
+
+            // adaptive sync threshold
+            if (level_check1 > sync_1.max)
+            {
+                sync_1.max = level_check1;
+            } else if (level_check1 < sync_1.min)
+            {
+                sync_1.min = level_check1;
+            }
+
+            if (level_check2 > sync_2.max)
+            {
+                sync_2.max = level_check2;
+            } else if (level_check2 < sync_2.min)
+            {
+                sync_2.min = level_check2;
+            }
+
+            if (tick_count > adaptive_sync_interval)
+            {
+                set_sync_threshold();
+                tick_count = 0;
+            } else {
+                tick_count++;
             }
         }
 
@@ -1058,6 +1239,7 @@ int main ()
                     SDL_RenderCopy(render, display_tex, NULL, &display_rec);
                     break;
                 case CCV2_PLAYBACK:
+                    draw(display_ccv2_tex);
                     SDL_RenderCopy(render, display_ccv2_tex, NULL, &display_rec);
                     break;
                 case CCI_DISPLAY:

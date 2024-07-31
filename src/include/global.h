@@ -46,6 +46,7 @@ const int sFreq = 48000;
 #define AUDIO_RATE 12288
 #define CCV2_AUDIO_RATE 13600
 #define AUDIO_SCAN_LEN 512
+#define CCV2_AUDIO_SCAN_LEN 680
 #define SAMPLES_INFRAME 4000
 const int frame_w = 85;
 const int scan_w = 100;
@@ -70,7 +71,7 @@ struct AudioBuffer{
 
 struct AudioStitch
 {
-    Sint16 data[AUDIO_SCAN_LEN];
+    Sint16 data[CCV2_AUDIO_SCAN_LEN];
     unsigned int pos = 0;
 };
 

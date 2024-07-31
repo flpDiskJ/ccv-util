@@ -101,6 +101,9 @@ void ccv_2::convert_image(string filename)
         for (int x = 0; x < frame_width; x++)
         {
             channel_1.push_back(luma[luma_pos++]);
+        }
+        for (int x = 0; x < frame_width; x++)
+        {
             if (l < 15)
             {
                 channel_2.push_back(luma[luma_pos++]);
