@@ -89,10 +89,8 @@ void ccv_image::convert_image(int i)
             l = 0.299*r + 0.587*g + 0.114*b;
             u = -0.147*r - 0.289*g + 0.436*b;
             v = 0.615*r - 0.515*g - 0.100*b;
-            l -= 128; // 128 <-> -127
-            if (l > 130){l = 130;}
-            if (l < -130){l = -130;}
-            l *= (sync_high / 4) / 130;
+            if (l > 255){l = 255;}
+            if (l < 0){l = 0;}
             if (u > 130){u = 130;}
             if (u < -130){u = -130;}
             if (v > 130){v = 130;}
@@ -122,6 +120,18 @@ void ccv_image::make_wav()
     audioFile.save ("output/CCI_signal.wav", AudioFileFormat::Wave);
 }
 
+void ccv_image::push_modulation(Sint16 val)
+{
+    val = val * modulation_freq[mod_pos];
+    channel_2.push_back(val);
+    if (mod_pos < 4)
+    {
+        mod_pos++;
+    } else {
+        mod_pos = 0;
+    }
+}
+
 void ccv_image::stitch(Sint16 *u, Sint16 *v, Sint16 *l)
 {
     Sint16 val = 0;
@@ -139,9 +149,8 @@ void ccv_image::stitch(Sint16 *u, Sint16 *v, Sint16 *l)
     }
     for (int i = 0; i < frame_width; i++)
     {
-        val = l[i];
-        channel_2.push_back(val);
-        channel_2.push_back(val);
+        push_modulation(l[i]);
+        push_modulation(l[i]);
     }
     blank(40);
 }
@@ -151,7 +160,7 @@ void ccv_image::blank(int sNum)
     for (int i = 0; i < sNum; i++)
     {
         channel_1.push_back(0);
-        channel_2.push_back(0);
+        push_modulation(0);
     }
 }
 
@@ -160,12 +169,12 @@ void ccv_image::sync_x()
     for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_low);
-        channel_2.push_back(sync_low);
+        push_modulation(0);
     }
     for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_high);
-        channel_2.push_back(sync_high);
+        push_modulation(0);
     }
     blank(44);
 }
@@ -175,12 +184,12 @@ void ccv_image::sync_y()
     for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_high);
-        channel_2.push_back(sync_high);
+        push_modulation(0);
     }
     for (int i = 0; i < 8; i++)
     {
         channel_1.push_back(sync_low);
-        channel_2.push_back(sync_low);
+        push_modulation(0);
     }
     blank(44);
 }

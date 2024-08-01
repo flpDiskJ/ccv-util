@@ -11,7 +11,7 @@ double sound_level = 2;
 bool invert_signal = true;
 bool swap_endianess = false;
 bool swap_channels = false;
-Sint16 luma_data[750][500];
+Sint16 luma_data[1500][500];
 Sint16 chroma_u_data[750][500];
 Sint16 chroma_v_data[750][500];
 vector<int> ccv2_chroma_u, ccv2_chroma_v;
@@ -597,12 +597,38 @@ void draw_cci_line(SDL_Texture *tex)
     int r, g, b, l, u, v;
     void *pixels;
     int pitch;
+    int l_peak = 0;
+    int count = 0;
+    int l_pos = 0;
     SDL_LockTexture(tex, NULL, &pixels, &pitch);
     for (int y = 0; y < 500; y++)
     {
+        l_pos = 0;
         for (int x = 0; x < 750; x++)
         {
-            l = luma_data[x][y];
+            for (int i = 0; i < 2; i++)
+            {
+                if (l_pos < 1500)
+                {
+                    if (luma_data[l_pos][y] < 0)
+                    {
+                        luma_data[l_pos][y] = 0 - luma_data[l_pos][y];
+                    }
+                    if (luma_data[l_pos][y] > l_peak)
+                    {
+                        l_peak = luma_data[l_pos][y];
+                    }
+                    if (count == 4)
+                    {
+                        count = 0;
+                        l = l_peak / cci_luma_level;
+                        l_peak = 0;
+                    } else {
+                        count++;
+                    }
+                    l_pos++;
+                }
+            }
             u = chroma_u_data[x][y];
             v = chroma_v_data[x][y];
             r = l + 1.140*v;
@@ -797,7 +823,7 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck)
 
             if (xCord >= 60 && xCord < 1560)
             {
-                luma_data[(xCord-60)/2][yCord] = (chan2 / cci_luma_level) + 127;
+                luma_data[xCord-60][yCord] = chan2;
                 if (xCord < 810)
                 {
                     chroma_u_data[xCord-60][yCord] = chan1 / chroma_level;
