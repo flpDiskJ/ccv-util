@@ -1262,6 +1262,9 @@ int main ()
                             case SDLK_c:
                                 swap_channels = !swap_channels;
                                 break;
+                            case SDLK_e:
+                                swap_endianess = !swap_endianess;
+                                break;
                             default:
                                 break;
                         }
