@@ -1002,7 +1002,7 @@ int main ()
     int mode;
     chan1_level = 1.0;
     chan2_level = 1.0;
-    printf("0 for CCV encoding \n1 for display\n2 for CCI encoding\n3 for CCV2 encoding\n");
+    printf(" 0 for Display\n 1 for CCV1 encoder\n 2 for CCV2 encoder\n 3 for CCI encoder\n> ");
 	scanf("%d", &mode);
     if (mode != 0 && mode != 1 && mode != 2 && mode != 3)
     {
@@ -1010,7 +1010,7 @@ int main ()
         return 0;
     }
 
-    if (mode == 2)
+    if (mode == 3)
     {
         ccv_image make_image;
         return 0;
@@ -1022,7 +1022,7 @@ int main ()
 		return 1;
 	}
 
-    if (mode == 0)
+    if (mode == 1)
     {
         Encoder encode;
         SDL_Quit();
@@ -1030,7 +1030,7 @@ int main ()
         return 0;
     }
 
-    if (mode == 3)
+    if (mode == 2)
     {
         ccv_2 ccv2_encode;
         SDL_Quit();
