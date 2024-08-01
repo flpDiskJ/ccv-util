@@ -2,23 +2,21 @@
 
 ccv_image::ccv_image()
 {
-    char tmp[101];
     string temp;
     int transition_rate = 3;
+    int photos = 0;
     printf("Image Transition Rate (Seconds): ");
     scanf("%d", &transition_rate);
-    printf("Type 'e' to break file entry\n");
-    while (true)
+    printf("Number of images to encode: ");
+    scanf("%d", &photos);
+    int image = 0;
+    while (image <= photos)
     {
-        printf("Image File(s): ");
-        scanf("%100s", tmp);
-        if (tmp[0] == 'e' && tmp[1] == '\0')
-        {
-            break;
-        }
         temp = "image_input/";
-        temp += tmp;
+        temp += to_string(image);
+        temp += ".png";
         files.push_back(temp);
+        image++;
     }
 
     printf("Processing...\n");
@@ -29,13 +27,6 @@ ccv_image::ccv_image()
         convert_image(x);
     }
     blank(sFreq * 3);
-
-    if (channel_1.size() != channel_2.size())
-    {
-        printf("size missmatch\n");
-        printf("%d %d\n", channel_1.size(), channel_2.size());
-        return;
-    }
 
     make_wav();
 
