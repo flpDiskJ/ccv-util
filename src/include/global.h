@@ -26,6 +26,7 @@ const int output_signal_amp = 1;
 // Adjustable playback constants
 const Sint16 cci_sync_high = 15000;
 const Sint16 cci_sync_low = -15000;
+const int cci_luma_level = 50; // lower is more
 const int luma_level = 25; // lower is more
 const int chroma_level = 35; // lower is more
 const double sync_detect_sensitivity = 2.2; // 1<  // higher is more sensitive

@@ -11,9 +11,9 @@ double sound_level = 2;
 bool invert_signal = true;
 bool swap_endianess = false;
 bool swap_channels = false;
-int luma_data[120][90];
-int chroma_u_data[120][90];
-int chroma_v_data[120][90];
+Sint16 luma_data[750][500];
+Sint16 chroma_u_data[750][500];
+Sint16 chroma_v_data[750][500];
 vector<int> ccv2_chroma_u, ccv2_chroma_v;
 int xCord = 0;
 int yCord = 0;
@@ -592,32 +592,32 @@ void set_sync_threshold()
     sync_2.min = -1000;
 }
 
-void draw_cci_line(SDL_Texture *tex, int y)
+void draw_cci_line(SDL_Texture *tex)
 {
+    int r, g, b, l, u, v;
     void *pixels;
     int pitch;
-    int pos = 0;
-    int r, g, b, l, u, v;
     SDL_LockTexture(tex, NULL, &pixels, &pitch);
-    for (int x = 0; x < 1500; x += 2)
+    for (int y = 0; y < 500; y++)
     {
-        l = (cci_l[x] + cci_l[x+1]) / 2;
-        u = cci_u[pos];
-        v = cci_v[pos];
-        r = l + 1.140*v;
-        g = l - 0.395*u - 0.581*v;
-        b = l + 2.032*u;
-        r = clip(r);
-        g = clip(g);
-        b = clip(b);
-        r = g = b = 100;
-        ((Uint32*)pixels)[ pos + (y * 750) ] = SDL_MapRGB(fmt, b, g, r);
-        pos++;
+        for (int x = 0; x < 750; x++)
+        {
+            l = luma_data[x][y];
+            u = chroma_u_data[x][y];
+            v = chroma_v_data[x][y];
+            r = l + 1.140*v;
+            g = l - 0.395*u - 0.581*v;
+            b = l + 2.032*u;
+            r = clip(r);
+            g = clip(g);
+            b = clip(b);
+            ((Uint32*)pixels)[ x + (y * 750) ] = SDL_MapRGB(fmt, b, g, r);
+        }
     }
     SDL_UnlockTexture(tex);
 }
 
-void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
+void scanner(AudioBuffer *b, AudioBuffer *plybck)
 {
     Sint32 level_check1, level_check2; // used for normalization
     while (b->back_pos != b->front_pos)
@@ -773,47 +773,68 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
         }
         else if (display_mode == CCI_DISPLAY)
         {
-            if (chan1 > cci_sync_high && sync_block_delay == 0)
+            if (chan1 > sync_1.sync_high && sync_block_delay == 0)
             {
-                sync_block_delay = sync_delay;
-                draw_cci_line(cci_tex, yCord);
-                update_display = true;
                 yCord = 0;
                 xCord = 0;
-            }
-            if (chan1 < cci_sync_low && sync_block_delay == 0)
-            {
                 sync_block_delay = sync_delay;
-                draw_cci_line(cci_tex, yCord);
-                update_display = true;
+            }
+            if (chan1 < sync_1.sync_low && sync_block_delay == 0)
+            {
                 xCord = 0;
                 if (yCord < 500)
                 {
                     yCord++;
-                } else {
-                    yCord = 0;
                 }
-            }
-
-            if (xCord >= 60 && xCord < 1560)
-            {
-                cci_l[xCord-60] = (int)((chan2 / 120) + 128);
-                if (xCord >= 60 && xCord < 810)
-                {
-                    cci_u[xCord-60] = (int)chan1;
-                } else if (xCord >= 810 && xCord < 1560)
-                {
-                    cci_v[xCord-810] = (int)chan1;
-                }
-            }
-            if (xCord < 1600)
-            {
-                xCord++;
+                sync_block_delay = sync_delay;
+                update_display = true;
             }
 
             if (sync_block_delay > 0)
             {
                 sync_block_delay--;
+            }
+
+            if (xCord >= 60 && xCord < 1560)
+            {
+                luma_data[(xCord-60)/2][yCord] = (chan2 / cci_luma_level) + 127;
+                if (xCord < 810)
+                {
+                    chroma_u_data[xCord-60][yCord] = chan1 / chroma_level;
+                }
+                else
+                {
+                    chroma_v_data[xCord-810][yCord] = chan1 / chroma_level;
+                }
+            }
+
+            if (xCord < 1600)
+            {
+                xCord++;
+            }
+
+            if (b->back_pos >= b->size - b->BytesInSample)
+            {
+                b->back_pos = 0;
+            } else {
+                b->back_pos += b->BytesInSample;
+            }
+
+            // adaptive sync threshold
+            if (level_check1 > sync_1.max)
+            {
+                sync_1.max = level_check1;
+            } else if (level_check1 < sync_1.min)
+            {
+                sync_1.min = level_check1;
+            }
+
+            if (tick_count > adaptive_sync_interval)
+            {
+                set_sync_threshold();
+                tick_count = 0;
+            } else {
+                tick_count++;
             }
         }
         else if (display_mode == CCV2_PLAYBACK)
@@ -1127,18 +1148,18 @@ int main ()
 
     SDL_Texture* display_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, frame_w, frame_h);
     SDL_Texture* display_ccv2_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 120, 90);
-    SDL_Texture* display_image_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 750, 500);
+    SDL_Texture* display_cci_tex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 750, 500);
     SDL_Rect display_rec;
     display_rec.w = frame_w*SCALE;
     display_rec.h = frame_h*SCALE;
     display_rec.x = (screen_w / 2) - (display_rec.w / 2);
     display_rec.y = (screen_h / 2) - (display_rec.h / 2);
 
-    SDL_Rect display_image_rec;
-    display_image_rec.w = 750;
-    display_image_rec.h = 500;
-    display_image_rec.x = (screen_w / 2) - (display_image_rec.w / 2);
-    display_image_rec.y = (screen_h / 2) - (display_image_rec.h / 2);
+    SDL_Rect display_cci_rec;
+    display_cci_rec.w = 750;
+    display_cci_rec.h = 500;
+    display_cci_rec.x = (screen_w / 2) - (display_cci_rec.w / 2);
+    display_cci_rec.y = (screen_h / 2) - (display_cci_rec.h / 2);
 
     clear_buffs();
 
@@ -1225,7 +1246,7 @@ int main ()
             }
         }
 
-        scanner(&audio_buffer, &sound_playback, display_image_tex);
+        scanner(&audio_buffer, &sound_playback);
 
         if (update_display)
         {
@@ -1243,7 +1264,8 @@ int main ()
                     SDL_RenderCopy(render, display_ccv2_tex, NULL, &display_rec);
                     break;
                 case CCI_DISPLAY:
-                    SDL_RenderCopy(render, display_image_tex, NULL, &display_image_rec);
+                    draw_cci_line(display_cci_tex);
+                    SDL_RenderCopy(render, display_cci_tex, NULL, &display_cci_rec);
                     break;
                 default:
                     break;

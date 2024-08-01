@@ -16,7 +16,7 @@ private:
 
     void make_wav();
 
-    void stitch(Sint32 *u, Sint32 *v, Sint32 *l);
+    void stitch(Sint16 *u, Sint16 *v, Sint16 *l);
 
     void blank(int sNum);
 

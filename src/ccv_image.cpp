@@ -65,8 +65,16 @@ void ccv_image::convert_image(int i)
         return;
     }
 
+    for (int i = 0; i < 4; i++) // garbage sync pulses used to set the sync detect during display
+    {
+        sync_y();
+        blank(750);
+        sync_x();
+        blank(750);
+    }
+
     sync_y();
-    Sint32 chroma_u[frame_width], chroma_v[frame_width], luma[frame_width];
+    Sint16 chroma_u[frame_width], chroma_v[frame_width], luma[frame_width];
     for (int y = 0; y < frame_height; y++)
     {
         if (y > 0)
@@ -84,7 +92,7 @@ void ccv_image::convert_image(int i)
             l -= 128; // 128 <-> -127
             if (l > 130){l = 130;}
             if (l < -130){l = -130;}
-            l *= (sync_high / 2) / 130;
+            l *= (sync_high / 4) / 130;
             if (u > 130){u = 130;}
             if (u < -130){u = -130;}
             if (v > 130){v = 130;}
@@ -114,24 +122,24 @@ void ccv_image::make_wav()
     audioFile.save ("output/CCI_signal.wav", AudioFileFormat::Wave);
 }
 
-void ccv_image::stitch(Sint32 *u, Sint32 *v, Sint32 *l)
+void ccv_image::stitch(Sint16 *u, Sint16 *v, Sint16 *l)
 {
     Sint16 val = 0;
     for (int i = 0; i < frame_width; i += 2)
     {
-        val = (Sint16)((u[i] + u[i+1]) / 2);
+        val = (u[i] + u[i+1]) / 2;
         channel_1.push_back(val);
         channel_1.push_back(val);
     }
     for (int i = 0; i < frame_width; i += 2)
     {
-        val = (Sint16)((v[i] + v[i+1]) / 2);
+        val = (v[i] + v[i+1]) / 2;
         channel_1.push_back(val);
         channel_1.push_back(val);
     }
     for (int i = 0; i < frame_width; i++)
     {
-        val = (Sint16)l[i];
+        val = l[i];
         channel_2.push_back(val);
         channel_2.push_back(val);
     }
