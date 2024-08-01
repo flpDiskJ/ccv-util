@@ -42,7 +42,6 @@ CCV1 (compact cassette video):
       85 x 64 pixels (4:3)
       12 FPS
       Audio: Signed 16bit WAV, 1 or 2 channel, 48 or 44.1 kHz
-
     Actual Specs:
       25ish X 64 (note: using a reel2reel or something with higher bandwidth may increase X resolution)
       12i Refresh
@@ -54,7 +53,6 @@ CCV2 (compact cassette video v2):
     120 x 90 pixels (4:3)
     10 FPS
     Audio: Signed 16bit WAV, 1 or 2 channel, 48 or 44.1 kHz
-
   Actual Specs:
     36ish X 90 (note: using a reel2reel or something with higher bandwidth may increase X resolution)
     10i Refresh
@@ -65,7 +63,6 @@ CCI (compact cassette image):
         750w x 500h
         8bit RGB
         PNG(s)
-
     Actual Specs:
         100ish x 500 (note: higher bandwidth won't increase quality much since it-
             -is limited by signal modulation)
