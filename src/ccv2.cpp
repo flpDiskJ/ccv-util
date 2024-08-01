@@ -20,6 +20,7 @@ ccv_2::ccv_2()
     {
         temp = "input/" + fill(x) + ".png";
         convert_image(temp);
+        y_offset = !y_offset;
     }
     blank(sFreq * 3);
 

@@ -496,9 +496,9 @@ void draw(SDL_Texture *tex)
     else
     {
         // upscale chroma data from 1800 to 10800
-        for (int c = 0; c < 1800; c++)
+        for (int c = 0; c < 900; c++)
         {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 12; i++)
             {
                 if (c < ccv2_chroma_u.size() && c < ccv2_chroma_v.size())
                 {
@@ -682,8 +682,7 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
                 double adv = (double)AUDIO_RATE / (double)sFreq;
                 Sint16 full_audio[AUDIO_SCAN_LEN*2];
                 stitch_audio(&full_audio[0]);
-                int sample_count = 0;
-                while (plybck->front_pos != plybck->back_pos && sample_count < 8000)
+                while (plybck->front_pos != plybck->back_pos && actual_pos < 1024)
                 {
                     plybck->buffer[plybck->front_pos] = full_audio[actual_pos] & 0xFF;
                     plybck->buffer[plybck->front_pos+1] = full_audio[actual_pos] >> 8 & 0xFF;
@@ -696,10 +695,6 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
                     }
                     stitch_pos += adv;
                     actual_pos = (int)stitch_pos;
-                    if (actual_pos >= AUDIO_SCAN_LEN*2)
-                    {
-                        actual_pos = (AUDIO_SCAN_LEN*2) - 1;
-                    }
                 }
                 memset(&full_audio[0], 0, AUDIO_SCAN_LEN*2);
             }
@@ -853,7 +848,7 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
                 double ccv2_adv = (double)CCV2_AUDIO_RATE / (double)sFreq;
                 Sint16 ccv2_full_audio[CCV2_AUDIO_SCAN_LEN*2];
                 stitch_audio(&ccv2_full_audio[0]);
-                while (plybck->front_pos != plybck->back_pos)
+                while (plybck->front_pos != plybck->back_pos && ccv2_actual_pos < 1360)
                 {
                     plybck->buffer[plybck->front_pos] = ccv2_full_audio[ccv2_actual_pos] & 0xFF;
                     plybck->buffer[plybck->front_pos+1] = ccv2_full_audio[ccv2_actual_pos] >> 8 & 0xFF;
@@ -866,10 +861,6 @@ void scanner(AudioBuffer *b, AudioBuffer *plybck, SDL_Texture *cci_tex)
                     }
                     ccv2_stitch_pos += ccv2_adv;
                     ccv2_actual_pos = (int)ccv2_stitch_pos;
-                    if (ccv2_actual_pos >= CCV2_AUDIO_SCAN_LEN*2)
-                    {
-                        ccv2_actual_pos = (CCV2_AUDIO_SCAN_LEN*2) - 1;
-                    }
                 }
                 memset(&ccv2_full_audio[0], 0, CCV2_AUDIO_SCAN_LEN*2);
             }
