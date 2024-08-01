@@ -63,8 +63,34 @@ void ccv_2::convert_image(string filename)
     }
 
     // prepare data
+    int chroma_y = 0;
+    bool chroma_line = false;
     for (int y = y_start; y < frame_height; y += 2)
     {
+        switch (chroma_y)
+        {
+            case 0:
+            case 6:
+            case 12:
+            case 18:
+            case 24:
+            case 30:
+            case 36:
+            case 42:
+            case 48:
+            case 54:
+            case 60:
+            case 66:
+            case 72:
+            case 78:
+            case 84:
+                chroma_line = true;
+                break;
+            default:
+                chroma_line = false;
+                break;
+        }
+        chroma_y += 2;
         for (int x = 0; x < frame_width; x++)
         {
             r = img[3 * ((y*frame_width) + x)    ];
@@ -82,8 +108,11 @@ void ccv_2::convert_image(string filename)
             if (v < -127){v = -127;}
             l = l * signal_amp;
             luma.push_back(l);
-            chroma_u.push_back(u);
-            chroma_v.push_back(v);
+            if (chroma_line)
+            {
+                chroma_u.push_back(u);
+                chroma_v.push_back(v);
+            }
         }
     }
 
@@ -233,28 +262,19 @@ bool ccv_2::load_audio()
 
 void ccv_2::chroma_downscale()
 {
-    // 5400 = size of full chroma data (45lines * 120pixels)
-    // 1800 = total size of chroma data (15lines * 120pixels)
+    // Downscale from 1800 to 900
     Sint16 val = 0;
-    for (int i = 0; i < 5400; i += 6)
+    for (int i = 0; i < 1800; i += 2)
     {
         val = chroma_u[i];
         val += chroma_u[i+1];
-        val += chroma_u[i+2];
-        val += chroma_u[i+3];
-        val += chroma_u[i+4];
-        val += chroma_u[i+5];
-        val /= 6;
+        val /= 2;
         val *= chroma_signal_amp;
         chroma_u_downscale.push_back(val);
 
         val = chroma_v[i];
         val += chroma_v[i+1];
-        val += chroma_v[i+2];
-        val += chroma_v[i+3];
-        val += chroma_v[i+4];
-        val += chroma_v[i+5];
-        val /= 6;
+        val /= 2;
         val *= chroma_signal_amp;
         chroma_v_downscale.push_back(val);
     }

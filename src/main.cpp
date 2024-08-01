@@ -495,21 +495,30 @@ void draw(SDL_Texture *tex)
         }}
     else
     {
-        // upscale chroma data from 1800 to 10800
-        for (int c = 0; c < 900; c++)
+        // upscale chroma data from 900 to 10800
+        for (int c = 0; c < 900; c += 60)
         {
-            for (int i = 0; i < 12; i++)
+            for (int i = 0; i < 6; i++) // 6 lines
             {
-                if (c < ccv2_chroma_u.size() && c < ccv2_chroma_v.size())
+                for (int p = 0; p < 60; p++)
                 {
-                    chroma_u_upscale.push_back(ccv2_chroma_u[c]);
-                    chroma_v_upscale.push_back(ccv2_chroma_v[c]);
-                } else {
-                    chroma_u_upscale.push_back(0);
-                    chroma_v_upscale.push_back(0);
+                    if (c+p < ccv2_chroma_u.size() && c+p < ccv2_chroma_v.size())
+                    {
+                        chroma_u_upscale.push_back(ccv2_chroma_u[c+p]);
+                        chroma_v_upscale.push_back(ccv2_chroma_v[c+p]);
+                        chroma_u_upscale.push_back(ccv2_chroma_u[c+p]);
+                        chroma_v_upscale.push_back(ccv2_chroma_v[c+p]);
+                    } else {
+                        chroma_u_upscale.push_back(0);
+                        chroma_v_upscale.push_back(0);
+                        chroma_u_upscale.push_back(0);
+                        chroma_v_upscale.push_back(0);
+                    }
                 }
             }
         }
+
+
         // draw frame
         int chroma_position = 0;
         for (int y = 0; y < 90; y++)
